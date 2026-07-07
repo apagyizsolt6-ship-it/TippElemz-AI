@@ -45,7 +45,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_pro_v10.json';
+    return '${dir.path}/tips_pro_v11.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -78,9 +78,9 @@ class _MainScreenState extends State<MainScreen> {
         if (res.statusCode == 200) {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
           for (var m in data) {
-            String league = m['league']['name'];
-            // CSAK a "Friendly" nevűek vannak kiszűrve, a Kupák és VB/EB maradnak
-            if (league.toLowerCase().contains("friendly")) continue; 
+            String league = m['league']['name'].toString().toLowerCase();
+            // Még szigorúbb szűrés a "Friendly" tartalomra
+            if (league.contains("friendly") || league.contains("club friendlies")) continue;
 
             int ts = m['fixture']['timestamp'];
             DateTime time = DateTime.fromMillisecondsSinceEpoch(ts * 1000);
@@ -88,7 +88,7 @@ class _MainScreenState extends State<MainScreen> {
               loaded.add({
                 "home": m['teams']['home']['name'],
                 "away": m['teams']['away']['name'],
-                "league": league,
+                "league": m['league']['name'],
                 "date": dateStr,
                 "fullDate": time.toString().substring(0, 16)
               });
@@ -102,6 +102,7 @@ class _MainScreenState extends State<MainScreen> {
 
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
+    int hG = rnd.nextInt(3), aG = rnd.nextInt(3);
     int conf = 70 + rnd.nextInt(25);
     int corners = 8 + rnd.nextInt(6);
     int cards = 2 + rnd.nextInt(4);
@@ -110,21 +111,24 @@ class _MainScreenState extends State<MainScreen> {
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text("Elemzés: ${m['home']} vs ${m['away']}", style: const TextStyle(fontSize: 16)),
+      title: Text("${m['home']} vs ${m['away']}", textAlign: TextAlign.center),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
-          child: Text("Bizalom Index: $conf%", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.cyanAccent))),
-        const SizedBox(height: 15),
-        _statRow("Szöglet ajánlás", "$corners db", Icons.circle_outlined),
+        Text("Bizalom: $conf%", style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+        const Divider(),
+        _statRow("Várható eredmény", "$hG - $aG", Icons.score),
+        _statRow("Over/Under 2.5", (hG + aG > 2.5) ? "Over" : "Under", Icons.trending_up),
+        _statRow("Szöglet tipp", "$corners db", Icons.circle_outlined),
         _statRow("Büntető lapok", "$cards db", Icons.warning),
         _statRow("Szabálytalanság", "$fouls db", Icons.sports),
-        const Divider(),
-        Text("AI Tipp: ${corners > 10 ? 'Over' : 'Under'} 10.5 szöglet", style: const TextStyle(color: Colors.white70)),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
         ElevatedButton(onPressed: () {
-          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "S:$corners, L:$cards, Sz:$fouls", "status": "függőben"}));
+          setState(() => _savedTips.add({
+            "match": "${m['home']} - ${m['away']}", 
+            "pick": "$hG-$aG | ${hG+aG>2.5?'Over':'Under'} | S:$corners", 
+            "status": "függőben"
+          }));
           _saveTips(); Navigator.pop(context);
         }, child: const Text("Mentés")),
       ],
@@ -132,7 +136,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _statRow(String label, String value, IconData icon) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
+    padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(children: [Icon(icon, size: 18, color: Colors.blueAccent), const SizedBox(width: 10), Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]),
   );
 
