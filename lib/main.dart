@@ -37,7 +37,6 @@ class _MainScreenState extends State<MainScreen> {
   final List<Map<String, String>> _savedTips = [];
   bool _isLoading = false;
 
-  // JAVÍTOTT LEKÉRÉS KÜLSŐ CSOMAG NÉLKÜL
   Future<void> _loadMatches() async {
     setState(() {
       _isLoading = true;
@@ -185,7 +184,7 @@ class _MainScreenState extends State<MainScreen> {
                         return Card(
                           color: const Color(0xFF1E293B),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          child: Typography🔴(item), // Egyszerűsített listaelem megjelenítés
+                          child: buildTipListItem(item),
                         );
                       },
                     ),
@@ -204,8 +203,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Segédfüggvény a tiszta kódért
-  Widget Typography🔴(Map<String, String> item) {
+  Widget buildTipListItem(Map<String, String> item) {
     return ListTile(
       title: Text(item['match']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       subtitle: Text("🔮 Tipp: ${item['pick']}", style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
