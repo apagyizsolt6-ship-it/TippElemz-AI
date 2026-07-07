@@ -14,6 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AI Tippelemző Pro',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0B0F19),
@@ -44,10 +45,18 @@ class _MainScreenState extends State<MainScreen> {
 
     try {
       final client = HttpClient();
-      // JAVÍTÁS: A live=all végpont lekéri a világon jelenleg zajló összes élő meccset
-      final request = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?live=all'));
       
-      // Kötelező hitelesítési fejlécek a te saját API kulcsoddal
+      // Mai dátum dinamikus lekérése ÉÉÉÉ-HH-NN formátumban az API számára
+      final now = DateTime.now();
+      final year = now.year;
+      final month = now.month.toString().padLeft(2, '0');
+      final day = now.day.toString().padLeft(2, '0');
+      final todayStr = "$year-$month-$day";
+
+      // JAVÍTÁS: A mai nap összes (következő és élő) meccsét kéri le
+      final request = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?date=$todayStr'));
+      
+      // Hitelesítési fejlécek a te saját API kulcsoddal
       request.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f'); 
       request.headers.add('x-rapidapi-host', 'v3.football.api-sports.io');
       request.headers.add(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10)');
@@ -65,13 +74,26 @@ class _MainScreenState extends State<MainScreen> {
           final String homeTeam = item['teams']['home']['name'] ?? 'Hazai';
           final String awayTeam = item['teams']['away']['name'] ?? 'Vendég';
           final String leagueName = item['league']['name'] ?? 'Liga';
+          
+          // Kezdési időpont kinyerése és formázása (Pl: 20:45)
+          final String dateStr = item['fixture']['date'] ?? '';
+          String formattedTime = "Ma";
+          if (dateStr.isNotEmpty) {
+            try {
+              final parsedDate = DateTime.parse(dateStr).toLocal();
+              final hour = parsedDate.hour.toString().padLeft(2, '0');
+              final minute = parsedDate.minute.toString().padLeft(2, '0');
+              formattedTime = "$hour:$minute";
+            } catch (_) {}
+          }
+
           final randomConf = "${75 + Random().nextInt(23)}%";
           
           loadedMatches.add({
             "home": homeTeam,
             "away": awayTeam,
             "league": "⚽ $leagueName",
-            "time": "Élő Meccs",
+            "time": "Kezdés: $formattedTime",
             "conf": randomConf
           });
         }
@@ -92,8 +114,13 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+      SnackBar(
+        content: Text(message), 
+        backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 
@@ -127,7 +154,7 @@ class _MainScreenState extends State<MainScreen> {
               });
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Tipp sikeresen elmentve!")),
+                const SnackBar(content: Text("Tipp sikeresen elmentve!"), backgroundColor: Color(0xFF10B981)),
               );
             },
             child: const Text("Mentés", style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
@@ -160,13 +187,13 @@ class _MainScreenState extends State<MainScreen> {
                     onPressed: _isLoading ? null : _loadMatches,
                     child: _isLoading 
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text("Valódi Meccsek Lekérése", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                      : const Text("Mai Meccsek Lekérése", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                   const SizedBox(height: 15),
                   if (_matches.isEmpty && !_isLoading)
                     const Padding(
                       padding: EdgeInsets.only(top: 40.0),
-                      child: Center(child: Text("Nyomj a fenti gombra az élő meccsekért!", style: TextStyle(color: Colors.white38))),
+                      child: Center(child: Text("Nyomj a fenti gombra a mai kínálatért!", style: TextStyle(color: Colors.white38))),
                     ),
                   ..._matches.map((m) => Card(
                         color: const Color(0xFF1E293B),
