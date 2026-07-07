@@ -45,7 +45,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_pro_v9.json';
+    return '${dir.path}/tips_pro_v10.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -79,7 +79,8 @@ class _MainScreenState extends State<MainScreen> {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
           for (var m in data) {
             String league = m['league']['name'];
-            if (league.contains("Friendly") || league.contains("Cup")) continue;
+            // CSAK a "Friendly" nevűek vannak kiszűrve, a Kupák és VB/EB maradnak
+            if (league.toLowerCase().contains("friendly")) continue; 
 
             int ts = m['fixture']['timestamp'];
             DateTime time = DateTime.fromMillisecondsSinceEpoch(ts * 1000);
@@ -104,24 +105,26 @@ class _MainScreenState extends State<MainScreen> {
     int conf = 70 + rnd.nextInt(25);
     int corners = 8 + rnd.nextInt(6);
     int cards = 2 + rnd.nextInt(4);
+    int fouls = 18 + rnd.nextInt(12);
     
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text("Pro Elemzés: ${m['home']} vs ${m['away']}", style: const TextStyle(fontSize: 16)),
+      title: Text("Elemzés: ${m['home']} vs ${m['away']}", style: const TextStyle(fontSize: 16)),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
           child: Text("Bizalom Index: $conf%", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.cyanAccent))),
         const SizedBox(height: 15),
-        _statRow("Szöglet előrejelzés", "$corners db", Icons.circle_outlined),
-        _statRow("Várható lapok", "$cards db", Icons.warning),
+        _statRow("Szöglet ajánlás", "$corners db", Icons.circle_outlined),
+        _statRow("Büntető lapok", "$cards db", Icons.warning),
+        _statRow("Szabálytalanság", "$fouls db", Icons.sports),
         const Divider(),
         Text("AI Tipp: ${corners > 10 ? 'Over' : 'Under'} 10.5 szöglet", style: const TextStyle(color: Colors.white70)),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
         ElevatedButton(onPressed: () {
-          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "S: $corners, L: $cards", "status": "függőben"}));
+          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "S:$corners, L:$cards, Sz:$fouls", "status": "függőben"}));
           _saveTips(); Navigator.pop(context);
         }, child: const Text("Mentés")),
       ],
