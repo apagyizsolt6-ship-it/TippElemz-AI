@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:convert';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,20 +35,33 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  List<Map<String, dynamic>> _matches = [];
+  List<Map<String, dynamic>> _allMatches = []; 
+  List<Map<String, dynamic>> _filteredMatches = []; 
   List<Map<String, String>> _savedTips = [];
   bool _isLoading = false;
+  
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _loadSavedTipsFromFile(); // Mentett tippek betöltése indításkor
+    _loadSavedTipsFromFile();
+    
+    _searchController.addListener(() {
+      _filterMatches(_searchController.text);
+    });
   }
 
-  // --- OFFLINE ADATBÁZIS FUNKCIÓK (FÁJL ALAPON) ---
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // --- ÖRÖKÖS OFFLINE ADATBÁZIS MENTÉS ---
   Future<String> _getFilePath() async {
-    final directory = Directory.systemTemp; // Biztonságos ideiglenes mappa az app számára
-    return '${directory.path}/saved_tips_ai.json';
+    final directory = await getApplicationDocumentsDirectory(); 
+    return '${directory.path}/saved_tips_pro.json';
   }
 
   Future<void> _loadSavedTipsFromFile() async {
@@ -70,6 +84,41 @@ class _MainScreenState extends State<MainScreen> {
       final file = File(path);
       await file.writeAsString(json.encode(_savedTips));
     } catch (_) {}
+  }
+
+  // Tipp törlése
+  Future<void> _deleteTip(int index) async {
+    setState(() {
+      _savedTips.removeAt(index);
+    });
+    await _saveTipsToFile();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Tipp sikeresen törölve!"), backgroundColor: Colors.orangeAccent),
+      );
+    }
+  }
+
+  // Keresési szűrő logika
+  void _filterMatches(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _filteredMatches = _allMatches;
+      });
+    } else {
+      setState(() {
+        _filteredMatches = _allMatches.where((m) {
+          final homeTeam = m['home'].toString().toLowerCase();
+          final awayTeam = m['away'].toString().toLowerCase();
+          final league = m['league'].toString().toLowerCase();
+          final searchLower = query.toLowerCase();
+          
+          return homeTeam.contains(searchLower) || 
+                 awayTeam.contains(searchLower) || 
+                 league.contains(searchLower);
+        }).toList();
+      });
+    }
   }
 
   Future<void> _loadMatches() async {
@@ -137,7 +186,8 @@ class _MainScreenState extends State<MainScreen> {
         }
 
         setState(() {
-          _matches = loadedMatches;
+          _allMatches = loadedMatches;
+          _filterMatches(_searchController.text); 
         });
       } else {
         _showErrorSnackBar("API Hiba! Kód: ${response.statusCode}");
@@ -183,7 +233,7 @@ class _MainScreenState extends State<MainScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Column(
           children: [
-            const Text("🤖 PRO AI MATRICAELEMZÉS", style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 16)),
+            const Text("🤖 PRO AI ELEMZŐ MOTOR", style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 10),
             Text("${match['home']} - ${match['away']}", style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
           ],
@@ -217,7 +267,7 @@ class _MainScreenState extends State<MainScreen> {
                   "conf": conf
                 });
               });
-              _saveTipsToFile(); // Elmentés az offline fájlba
+              _saveTipsToFile(); 
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pro tipp elmentve!"), backgroundColor: Color(0xFF10B981)));
             },
@@ -281,14 +331,32 @@ class _MainScreenState extends State<MainScreen> {
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                       : const Text("Mai Kínálat Frissítése", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 12),
+                  
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: "Keresés csapat vagy liga alapján...",
+                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+                      prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                      filled: true,
+                      fillColor: const Color(0xFF1E293B),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  
                   Expanded(
-                    child: _matches.isEmpty && !_isLoading
-                        ? const Center(child: Text("Nyomj a fenti gombra az adatokért!", style: TextStyle(color: Colors.white38)))
+                    child: _filteredMatches.isEmpty && !_isLoading
+                        ? const Center(child: Text("Nincs a keresésnek megfelelő meccs.", style: TextStyle(color: Colors.white38)))
                         : ListView.builder(
-                            itemCount: _matches.length,
+                            itemCount: _filteredMatches.length,
                             itemBuilder: (context, index) {
-                              final m = _matches[index];
+                              final m = _filteredMatches[index];
                               final isLive = m['status'] == "1H" || m['status'] == "2H" || m['status'] == "HT";
                               
                               return Card(
@@ -374,7 +442,17 @@ class _MainScreenState extends State<MainScreen> {
                           child: ListTile(
                             title: Text(item['match']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                             subtitle: Text(item['pick']!, style: const TextStyle(color: Color(0xFF10B981), fontSize: 12)),
-                            trailing: Text(item['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(item['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 10),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                                  onPressed: () => _deleteTip(index),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },
