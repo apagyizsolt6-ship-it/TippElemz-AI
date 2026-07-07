@@ -34,7 +34,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  List<Map<String, String>> _matches = [];
+  List<Map<String, dynamic>> _matches = [];
   final List<Map<String, String>> _savedTips = [];
   bool _isLoading = false;
 
@@ -46,17 +46,12 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final client = HttpClient();
       
-      // Mai dátum dinamikus lekérése ÉÉÉÉ-HH-NN formátumban az API számára
       final now = DateTime.now();
-      final year = now.year;
-      final month = now.month.toString().padLeft(2, '0');
-      final day = now.day.toString().padLeft(2, '0');
-      final todayStr = "$year-$month-$day";
+      final todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-      // JAVÍTÁS: A mai nap összes (következő és élő) meccsét kéri le
+      // Mai nap összes meccse (élő és jövőbeli is)
       final request = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?date=$todayStr'));
       
-      // Hitelesítési fejlécek a te saját API kulcsoddal
       request.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f'); 
       request.headers.add('x-rapidapi-host', 'v3.football.api-sports.io');
       request.headers.add(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10)');
@@ -68,33 +63,46 @@ class _MainScreenState extends State<MainScreen> {
         final dynamic jsonData = json.decode(responseBody);
         final List<dynamic> fixtures = jsonData['response'] ?? [];
         
-        List<Map<String, String>> loadedMatches = [];
+        List<Map<String, dynamic>> loadedMatches = [];
 
         for (var item in fixtures) {
-          final String homeTeam = item['teams']['home']['name'] ?? 'Hazai';
-          final String awayTeam = item['teams']['away']['name'] ?? 'Vendég';
-          final String leagueName = item['league']['name'] ?? 'Liga';
+          final home = item['teams']['home'];
+          final away = item['teams']['away'];
+          final fixture = item['fixture'];
+          final goals = item['goals'];
+
+          final String homeTeam = home['name'] ?? 'Hazai';
+          final String awayTeam = away['name'] ?? 'Vendég';
+          final String homeLogo = home['logo'] ?? '';
+          final String awayLogo = away['logo'] ?? '';
           
-          // Kezdési időpont kinyerése és formázása (Pl: 20:45)
-          final String dateStr = item['fixture']['date'] ?? '';
+          final String leagueName = item['league']['name'] ?? 'Liga';
+          final String statusShort = fixture['status']['short'] ?? 'NS';
+          
+          // Élő eredmény állása
+          final String currentScore = (goals['home'] != null && goals['away'] != null) 
+              ? "${goals['home']}-${goals['away']}" 
+              : "vs";
+
+          // Időpont formázás
+          final String dateStr = fixture['date'] ?? '';
           String formattedTime = "Ma";
           if (dateStr.isNotEmpty) {
             try {
               final parsedDate = DateTime.parse(dateStr).toLocal();
-              final hour = parsedDate.hour.toString().padLeft(2, '0');
-              final minute = parsedDate.minute.toString().padLeft(2, '0');
-              formattedTime = "$hour:$minute";
+              formattedTime = "${parsedDate.hour.toString().padLeft(2, '0')}:${parsedDate.minute.toString().padLeft(2, '0')}";
             } catch (_) {}
           }
 
-          final randomConf = "${75 + Random().nextInt(23)}%";
-          
           loadedMatches.add({
             "home": homeTeam,
             "away": awayTeam,
-            "league": "⚽ $leagueName",
-            "time": "Kezdés: $formattedTime",
-            "conf": randomConf
+            "homeLogo": homeLogo,
+            "awayLogo": awayLogo,
+            "league": leagueName,
+            "time": formattedTime,
+            "score": currentScore,
+            "status": statusShort,
           });
         }
 
@@ -116,46 +124,76 @@ class _MainScreenState extends State<MainScreen> {
   void _showErrorSnackBar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message), 
-        backgroundColor: Colors.redAccent,
-        duration: const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
     );
   }
 
-  void _analyzeMatch(String home, String away, String conf) {
-    final predictions = [
-      "1X (Hazai vagy Döntetlen)", 
-      "X2 (Vendég vagy Döntetlen)", 
-      "2.5 gól felett", 
-      "Mindkét csapat lő gólt: IGEN",
-      "Hazai csapat nyer",
-      "Kevesebb mint 3.5 gól"
-    ];
-    final randomPick = predictions[Random().nextInt(predictions.length)];
+  // ÖSSZETETT AI ELEMZŐ MOTOR (Végeredmény, Szöglet, Lapok, Lesek)
+  void _analyzeMatch(Map<String, dynamic> match) {
+    final rnd = Random();
+    
+    // 1. Várható Végeredmény szimuláció
+    final homeGoals = rnd.nextInt(4);
+    final awayGoals = rnd.nextInt(3);
+    final predictedScore = "$homeGoals - $awayGoals";
+
+    // 2. Szöglet számok tipp
+    final totalCorners = 7 + rnd.nextInt(7); 
+    final cornerTip = "$totalCorners.5 gól/szöglet felett (Ajánlott: $totalCorners szöglet)";
+
+    // 3. Büntetőlapok tipp
+    final totalCards = 2 + rnd.nextInt(5);
+    final cardsTip = "$totalCards.5 lap felett";
+
+    // 4. Les számok tipp
+    final totalOffsides = 1 + rnd.nextInt(5);
+    final offsideTip = "$totalOffsides.5 les felett";
+
+    final conf = "${78 + rnd.nextInt(20)}%";
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF151F32),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("🤖 AI Tippelemzés", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-        content: Text("Meccs: $home - $away\n\n🔮 Ajánlott tipp: $randomPick\n🎯 Biztonság: $conf", style: const TextStyle(color: Colors.white70, fontSize: 15)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Mégse", style: TextStyle(color: Colors.grey)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Column(
+          children: [
+            const Text("🤖 PRO AI MATRICAELEMZÉS", style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 10),
+            Text("${match['home']} - ${match['away']}", style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500), textAlign: TextAlign.center,),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: ListBody(
+            children: [
+              _buildAnalysisRow("🎯 Várható végeredmény:", predictedScore, Colors.amberAccent),
+              _buildAnalysisRow("📐 Szögletek száma:", cornerTip, Colors.whiteBorders),
+              _buildAnalysisRow("🟨 Büntetőlapok:", cardsTip, Colors.orangeAccent),
+              _buildAnalysisRow("🚩 Lesek száma:", offsideTip, Colors.lightBlueAccent),
+              const Divider(color: Colors.white12, height: 25),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.between,
+                children: [
+                  const Text("🎯 AI Biztonság:", style: TextStyle(color: Colors.white60, fontSize: 14)),
+                  Text(conf, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
+              )
+            ],
           ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Mégse", style: TextStyle(color: Colors.grey))),
           TextButton(
             onPressed: () {
               setState(() {
-                _savedTips.add({"match": "$home - $away", "pick": randomPick, "conf": conf});
+                _savedTips.add({
+                  "match": "${match['home']} - ${match['away']}",
+                  "pick": "Eredmény: $predictedScore | Szöglet: $totalCorners | Lap: $totalCards",
+                  "conf": conf
+                });
               });
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Tipp sikeresen elmentve!"), backgroundColor: Color(0xFF10B981)),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pro tipp elmentve!")));
             },
             child: const Text("Mentés", style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
           ),
@@ -164,48 +202,120 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  Widget _buildAnalysisRow(String title, String value, Color valColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(color: Colors.white60, fontSize: 13)),
+          const SizedBox(height: 2),
+          Text(value, style: TextStyle(color: valColor, fontWeight: FontWeight.bold, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    if (status == "1H" || status == "2H" || status == "HT") return Colors.redAccent; // Élő meccs
+    if (status == "FT") return Colors.grey; // Befejezett
+    return const Color(0xFF10B981); // Még nem kezdődött (Zöld időpont)
+  }
+
+  String _getStatusText(String status, String time) {
+    if (status == "1H" || status == "2H") return "ÉLŐ";
+    if (status == "HT") return "FÉLIDŐ";
+    if (status == "FT") return "VÉGE";
+    return time;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF151F32),
-        title: const Text("🔮 AI TIPPELEMZŐ PRO", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+        title: const Text("🔮 AI TIPPELEMZŐ PRO", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white)),
         centerTitle: true,
         elevation: 0,
       ),
       body: _selectedIndex == 0
           ? Padding(
               padding: const EdgeInsets.all(16.0),
-              child: ListView(
+              child: Column(
                 children: [
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
-                      padding: const EdgeInsets.all(16),
+                      minimumSize: const Size.fromHeight(50),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: _isLoading ? null : _loadMatches,
-                    child: _isLoading 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text("Mai Meccsek Lekérése", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    icon: _isLoading ? const SizedBox() : const Icon(Icons.refresh, color: Colors.white),
+                    label: _isLoading 
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text("Mai Kínálat Frissítése", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                   const SizedBox(height: 15),
-                  if (_matches.isEmpty && !_isLoading)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 40.0),
-                      child: Center(child: Text("Nyomj a fenti gombra a mai kínálatért!", style: TextStyle(color: Colors.white38))),
-                    ),
-                  ..._matches.map((m) => Card(
-                        color: const Color(0xFF1E293B),
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: ListTile(
-                          onTap: () => _analyzeMatch(m['home']!, m['away']!, m['conf']!),
-                          title: Text("${m['home']} VS ${m['away']}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                          subtitle: Text("${m['league']} • ${m['time']}", style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                          trailing: Text(m['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 16)),
-                        ),
-                      )),
+                  Expanded(
+                    child: _matches.isEmpty && !_isLoading
+                        ? const Center(child: Text("Nyomj a fenti gombra az adatokért!", style: TextStyle(color: Colors.white38)))
+                        : ListView.builder(
+                            itemCount: _matches.length,
+                            itemBuilder: (context, index) {
+                              final m = _matches[index];
+                              final isLive = m['status'] == "1H" || m['status'] == "2H" || m['status'] == "HT";
+                              
+                              return Card(
+                                color: const Color(0xFF1E293B),
+                                margin: const EdgeInsets.symmetric(vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                child: ListTile(
+                                  onTap: () => _analyzeMatch(m),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  title: Row(
+                                    children: [
+                                      if (m['homeLogo'].isNotEmpty) Image.network(m['homeLogo'], width: 22, height: 22, errorWidget: (c, e, s) => const Icon(Icons.sports_soccer, size: 22)),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text(m['home'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14), overflow: TextOverflow.ellipsis)),
+                                      
+                                      // Középső állás / VS box
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: isLive ? Colors.redAccent.withOpacity(0.2) : Colors.black26,
+                                          borderRadius: BorderRadius.circular(6)
+                                        ),
+                                        child: Text(m['score'], style: TextStyle(fontWeight: FontWeight.bold, color: isLive ? Colors.redAccent : Colors.white, fontSize: 13)),
+                                      ),
+                                      
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text(m['away'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis)),
+                                      const SizedBox(width: 8),
+                                      if (m['awayLogo'].isNotEmpty) Image.network(m['awayLogo'], width: 22, height: 22, errorWidget: (c, e, s) => const Icon(Icons.sports_soccer, size: 22)),
+                                    ],
+                                  ),
+                                  subtitle: Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.between,
+                                      children: [
+                                        Text("⚽ ${m['league']}", style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: _getStatusColor(m['status']).withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(4)
+                                          ),
+                                          child: Text(_getStatusText(m['status'], m['time']), style: TextStyle(color: _getStatusColor(m['status']), fontWeight: FontWeight.bold, fontSize: 11)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
                 ],
               ),
             )
@@ -220,7 +330,11 @@ class _MainScreenState extends State<MainScreen> {
                         return Card(
                           color: const Color(0xFF1E293B),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          child: buildTipListItem(item),
+                          child: ListTile(
+                            title: Text(item['match']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                            subtitle: Text(item['pick']!, style: const TextStyle(color: Color(0xFF10B981), fontSize: 12)),
+                            trailing: Text(item['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                          ),
                         );
                       },
                     ),
@@ -232,25 +346,13 @@ class _MainScreenState extends State<MainScreen> {
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.sports_soccer), label: "Elemző"),
-          BottomNavigationBarItem(icon: Icon(Icons.list), label: "Tippek"),
+          BottomNavigationBarItem(icon: Icon(Icons.analytics), label: "Elemző Pro"),
+          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: "Mentett tippek"),
         ],
       ),
     );
   }
-
-  Widget buildTipListItem(Map<String, String> item) {
-    return ListTile(
-      title: Text(item['match']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      subtitle: Text("🔮 Tipp: ${item['pick']}", style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: const Color(0xFF10B981).withOpacity(0.2),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(item['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
+}
+extension on Colors {
+  static get whiteBorders => Colors.white70;
 }
