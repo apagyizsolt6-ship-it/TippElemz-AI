@@ -44,9 +44,12 @@ class _MainScreenState extends State<MainScreen> {
 
     try {
       final client = HttpClient();
-      // JAVÍTÁS: Átváltottunk biztonságos HTTPS protokollra, amit az Android nem blokkol!
-      final request = await client.getUrl(Uri.parse('https://raw.githubusercontent.com/openfootball/football.json/master/2020-21/en.1.json'));
+      // Az API-Football hivatalos végpontja (Angol Premier League következő meccsei)
+      final request = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?league=39&season=2026&next=10'));
       
+      // Kötelező hitelesítési fejlécek az API felé
+      request.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f'); // <--- IDE MÁSOLD BE A KULCSODAT!
+      request.headers.add('x-rapidapi-host', 'v3.football.api-sports.io');
       request.headers.add(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10)');
       
       final response = await request.close();
@@ -54,37 +57,33 @@ class _MainScreenState extends State<MainScreen> {
       if (response.statusCode == 200) {
         final responseBody = await response.transform(utf8.decoder).join();
         final dynamic jsonData = json.decode(responseBody);
-        final List<dynamic> rounds = jsonData['rounds'] ?? [];
+        final List<dynamic> fixtures = jsonData['response'] ?? [];
         
         List<Map<String, String>> loadedMatches = [];
 
-        if (rounds.isNotEmpty) {
-          final List<dynamic> matchesData = rounds[Random().nextInt(rounds.length)]['matches'] ?? [];
+        for (var item in fixtures) {
+          final String homeTeam = item['teams']['home']['name'] ?? 'Hazai';
+          final String awayTeam = item['teams']['away']['name'] ?? 'Vendég';
+          final String leagueName = item['league']['name'] ?? 'Liga';
+          final randomConf = "${75 + Random().nextInt(23)}%";
           
-          for (var item in matchesData.take(10)) {
-            final String homeTeam = item['team1'] ?? 'Hazai Csapat';
-            final String awayTeam = item['team2'] ?? 'Vendég Csapat';
-            final randomConf = "${72 + Random().nextInt(26)}%";
-            
-            loadedMatches.add({
-              "home": homeTeam,
-              "away": awayTeam,
-              "league": "🇬🇧 Premier League",
-              "time": item['date'] ?? 'Mai Meccs',
-              "conf": randomConf
-            });
-          }
+          loadedMatches.add({
+            "home": homeTeam,
+            "away": awayTeam,
+            "league": "🇬🇧 $leagueName",
+            "time": "Következő forduló",
+            "conf": randomConf
+          });
         }
 
         setState(() {
           _matches = loadedMatches;
         });
       } else {
-        _showErrorSnackBar("Szerver hiba (Kód: ${response.statusCode})");
+        _showErrorSnackBar("API Hiba! Kód: ${response.statusCode}");
       }
     } catch (e) {
-      // Bővített hibaüzenet, hogy lássuk ha a rendszer dobja el
-      _showErrorSnackBar("Hiba: ${e.toString().take(40)}...");
+      _showErrorSnackBar("Hálózati hiba lépett fel.");
     } finally {
       setState(() {
         _isLoading = false;
