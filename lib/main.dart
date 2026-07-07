@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(brightness: Brightness.dark, scaffoldBackgroundColor: const Color(0xFF0F172A), primaryColor: const Color(0xFF3B82F6)),
+      theme: ThemeData(brightness: Brightness.dark, scaffoldBackgroundColor: const Color(0xFF0F172A)),
       home: const MainScreen(),
     );
   }
@@ -43,6 +43,22 @@ class _MainScreenState extends State<MainScreen> {
     await _loadMatches();
   }
 
+  Future<String> _getPath() async => (await getApplicationDocumentsDirectory()).path + '/tips_final_fixed.json';
+
+  Future<void> _loadSavedTips() async {
+    final file = File(await _getPath());
+    if (await file.exists()) {
+      try {
+        final content = await file.readAsString();
+        setState(() => _savedTips = List<Map<String, dynamic>>.from(json.decode(content)));
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _saveTips() async {
+    await File(await _getPath()).writeAsString(json.encode(_savedTips));
+  }
+
   Future<void> _loadMatches() async {
     setState(() => _isLoading = true);
     List<Map<String, dynamic>> loaded = [];
@@ -58,13 +74,17 @@ class _MainScreenState extends State<MainScreen> {
         if (res.statusCode == 200) {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
           for (var m in data) {
+            String leagueName = m['league']['name'];
+            // Barátságos meccsek szűrése
+            if (leagueName.contains("Friendlies")) continue;
+
             int ts = m['fixture']['timestamp'];
             DateTime matchTime = DateTime.fromMillisecondsSinceEpoch(ts * 1000);
             if (matchTime.isAfter(now)) {
               loaded.add({
                 "home": m['teams']['home']['name'],
                 "away": m['teams']['away']['name'],
-                "league": m['league']['name'],
+                "league": leagueName,
                 "date": dateStr,
                 "fullDate": matchTime.toString().substring(0, 16)
               });
@@ -76,45 +96,38 @@ class _MainScreenState extends State<MainScreen> {
     setState(() { _allMatches = loaded; _filteredMatches = loaded; _isLoading = false; });
   }
 
-  void _filterMatches(String date) {
-    setState(() {
-      _selectedDateFilter = date;
-      if (date == "Összes") {
-        _filteredMatches = _allMatches;
-      } else {
-        _filteredMatches = _allMatches.where((m) => m['date'] == date).toList();
-      }
-    });
-  }
-
-  // --- ANALÍZIS ÉS MENTÉS ---
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
+    int hG = rnd.nextInt(3), aG = rnd.nextInt(3);
+    
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text("${m['home']}\nvs\n${m['away']}", textAlign: TextAlign.center),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Text("Dátum: ${m['fullDate']}", style: const TextStyle(color: Colors.cyanAccent)),
         const SizedBox(height: 15),
-        Text("${rnd.nextInt(3)}-${rnd.nextInt(3)}", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 15),
-        _statRow("Szöglet", "${8 + rnd.nextInt(5)}", Icons.circle_outlined, Colors.orange),
-        _statRow("Büntetőlapok", "${2 + rnd.nextInt(4)}", Icons.warning, Colors.red),
+        Text("$hG - $aG", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+        const Divider(),
+        _statRow("Szöglet", "${8 + rnd.nextInt(5)}", Icons.circle_outlined),
+        _statRow("Büntetőlapok", "${2 + rnd.nextInt(4)}", Icons.warning),
+        _statRow("Lesek", "${2 + rnd.nextInt(3)}", Icons.flag),
+        _statRow("Szabálytalanság", "${18 + rnd.nextInt(10)}", Icons.sports),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
         ElevatedButton(onPressed: () {
-          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "Generált", "status": "pending"}));
+          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "$hG-$aG", "status": "pending"}));
+          _saveTips();
           Navigator.pop(context);
         }, child: const Text("Mentés")),
       ],
     ));
   }
 
-  Widget _statRow(String label, String value, IconData icon, Color color) => Padding(
+  Widget _statRow(String label, String value, IconData icon) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(children: [Icon(icon, size: 16, color: color), const SizedBox(width: 10), Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]),
+    child: Row(children: [Icon(icon, size: 16), const SizedBox(width: 10), Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]),
   );
 
   @override
@@ -125,21 +138,23 @@ class _MainScreenState extends State<MainScreen> {
       appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO")),
       body: _selectedIndex == 0
           ? Column(children: [
-              SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: dates.map((d) => Padding(padding: const EdgeInsets.all(5), child: ChoiceChip(label: Text(d), selected: _selectedDateFilter == d, onSelected: (_) => _filterMatches(d)))).toList())),
+              SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: dates.map((d) => Padding(padding: const EdgeInsets.all(5), child: ChoiceChip(label: Text(d), selected: _selectedDateFilter == d, onSelected: (val) {
+                setState(() { _selectedDateFilter = d; _filteredMatches = (d == "Összes") ? _allMatches : _allMatches.where((m) => m['date'] == d).toList(); });
+              }))).toList())),
               Expanded(child: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
                 itemCount: _filteredMatches.length,
-                itemBuilder: (_, i) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                  decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(15)),
-                  child: ListTile(
-                    title: Text("${_filteredMatches[i]['home']} - ${_filteredMatches[i]['away']}"),
-                    subtitle: Text("${_filteredMatches[i]['league']} | ${_filteredMatches[i]['fullDate']}"),
-                    onTap: () => _analyze(_filteredMatches[i]),
-                  ),
-                ),
+                itemBuilder: (_, i) => Card(margin: const EdgeInsets.all(8), color: const Color(0xFF1E293B), child: ListTile(
+                  title: Text("${_filteredMatches[i]['home']} - ${_filteredMatches[i]['away']}"),
+                  subtitle: Text("${_filteredMatches[i]['league']} | ${_filteredMatches[i]['fullDate']}"),
+                  onTap: () => _analyze(_filteredMatches[i]),
+                )),
               ))
             ])
-          : Container(), // ... egyéb logika ...
+          : ListView.builder(itemCount: _savedTips.length, itemBuilder: (_, i) => ListTile(
+              title: Text(_savedTips[i]['match']),
+              subtitle: Text("Tipp: ${_savedTips[i]['pick']} | ${_savedTips[i]['status']}"),
+              trailing: IconButton(icon: const Icon(Icons.check_circle, color: Colors.green), onPressed: () => setState(() => _savedTips[i]['status'] = 'won')),
+            )),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (i) => setState(() => _selectedIndex = i),
@@ -147,6 +162,4 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
-
-  Future<void> _loadSavedTips() async {} 
 }
