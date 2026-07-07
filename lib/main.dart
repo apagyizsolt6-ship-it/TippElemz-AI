@@ -35,8 +35,42 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   List<Map<String, dynamic>> _matches = [];
-  final List<Map<String, String>> _savedTips = [];
+  List<Map<String, String>> _savedTips = [];
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedTipsFromFile(); // Mentett tippek betöltése indításkor
+  }
+
+  // --- OFFLINE ADATBÁZIS FUNKCIÓK (FÁJL ALAPON) ---
+  Future<String> _getFilePath() async {
+    final directory = Directory.systemTemp; // Biztonságos ideiglenes mappa az app számára
+    return '${directory.path}/saved_tips_ai.json';
+  }
+
+  Future<void> _loadSavedTipsFromFile() async {
+    try {
+      final path = await _getFilePath();
+      final file = File(path);
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final List<dynamic> decoded = json.decode(content);
+        setState(() {
+          _savedTips = decoded.map((item) => Map<String, String>.from(item)).toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveTipsToFile() async {
+    try {
+      final path = await _getFilePath();
+      final file = File(path);
+      await file.writeAsString(json.encode(_savedTips));
+    } catch (_) {}
+  }
 
   Future<void> _loadMatches() async {
     setState(() {
@@ -45,11 +79,9 @@ class _MainScreenState extends State<MainScreen> {
 
     try {
       final client = HttpClient();
-      
       final now = DateTime.now();
       final todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-      // Mai nap összes meccse (élő és jövőbeli is)
       final request = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?date=$todayStr'));
       
       request.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f'); 
@@ -79,12 +111,10 @@ class _MainScreenState extends State<MainScreen> {
           final String leagueName = item['league']['name'] ?? 'Liga';
           final String statusShort = fixture['status']['short'] ?? 'NS';
           
-          // Élő eredmény állása
           final String currentScore = (goals['home'] != null && goals['away'] != null) 
               ? "${goals['home']}-${goals['away']}" 
               : "vs";
 
-          // Időpont formázás
           final String dateStr = fixture['date'] ?? '';
           String formattedTime = "Ma";
           if (dateStr.isNotEmpty) {
@@ -128,24 +158,19 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // ÖSSZETETT AI ELEMZŐ MOTOR (Végeredmény, Szöglet, Lapok, Lesek)
   void _analyzeMatch(Map<String, dynamic> match) {
     final rnd = Random();
     
-    // 1. Várható Végeredmény szimuláció
     final homeGoals = rnd.nextInt(4);
     final awayGoals = rnd.nextInt(3);
     final predictedScore = "$homeGoals - $awayGoals";
 
-    // 2. Szöglet számok tipp
     final totalCorners = 7 + rnd.nextInt(7); 
-    final cornerTip = "$totalCorners.5 gól/szöglet felett (Ajánlott: $totalCorners szöglet)";
+    final cornerTip = "$totalCorners.5 szöglet felett (Ajánlott: $totalCorners szöglet)";
 
-    // 3. Büntetőlapok tipp
     final totalCards = 2 + rnd.nextInt(5);
     final cardsTip = "$totalCards.5 lap felett";
 
-    // 4. Les számok tipp
     final totalOffsides = 1 + rnd.nextInt(5);
     final offsideTip = "$totalOffsides.5 les felett";
 
@@ -160,19 +185,19 @@ class _MainScreenState extends State<MainScreen> {
           children: [
             const Text("🤖 PRO AI MATRICAELEMZÉS", style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 10),
-            Text("${match['home']} - ${match['away']}", style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500), textAlign: TextAlign.center,),
+            Text("${match['home']} - ${match['away']}", style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
           ],
         ),
         content: SingleChildScrollView(
           child: ListBody(
             children: [
               _buildAnalysisRow("🎯 Várható végeredmény:", predictedScore, Colors.amberAccent),
-              _buildAnalysisRow("📐 Szögletek száma:", cornerTip, Colors.whiteBorders),
+              _buildAnalysisRow("📐 Szögletek száma:", cornerTip, Colors.white70),
               _buildAnalysisRow("🟨 Büntetőlapok:", cardsTip, Colors.orangeAccent),
               _buildAnalysisRow("🚩 Lesek száma:", offsideTip, Colors.lightBlueAccent),
               const Divider(color: Colors.white12, height: 25),
               Row(
-                mainAxisAlignment: MainAxisAlignment.between,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text("🎯 AI Biztonság:", style: TextStyle(color: Colors.white60, fontSize: 14)),
                   Text(conf, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 16)),
@@ -192,8 +217,9 @@ class _MainScreenState extends State<MainScreen> {
                   "conf": conf
                 });
               });
+              _saveTipsToFile(); // Elmentés az offline fájlba
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pro tipp elmentve!")));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pro tipp elmentve!"), backgroundColor: Color(0xFF10B981)));
             },
             child: const Text("Mentés", style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
           ),
@@ -217,9 +243,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Color _getStatusColor(String status) {
-    if (status == "1H" || status == "2H" || status == "HT") return Colors.redAccent; // Élő meccs
-    if (status == "FT") return Colors.grey; // Befejezett
-    return const Color(0xFF10B981); // Még nem kezdődött (Zöld időpont)
+    if (status == "1H" || status == "2H" || status == "HT") return Colors.redAccent; 
+    if (status == "FT") return Colors.grey; 
+    return const Color(0xFF10B981); 
   }
 
   String _getStatusText(String status, String time) {
@@ -252,7 +278,7 @@ class _MainScreenState extends State<MainScreen> {
                     onPressed: _isLoading ? null : _loadMatches,
                     icon: _isLoading ? const SizedBox() : const Icon(Icons.refresh, color: Colors.white),
                     label: _isLoading 
-                      ? const CircularProgressIndicator(color: Colors.white)
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                       : const Text("Mai Kínálat Frissítése", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                   const SizedBox(height: 15),
@@ -274,11 +300,18 @@ class _MainScreenState extends State<MainScreen> {
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                   title: Row(
                                     children: [
-                                      if (m['homeLogo'].isNotEmpty) Image.network(m['homeLogo'], width: 22, height: 22, errorWidget: (c, e, s) => const Icon(Icons.sports_soccer, size: 22)),
+                                      if (m['homeLogo'].isNotEmpty) 
+                                        Image.network(
+                                          m['homeLogo'], 
+                                          width: 22, 
+                                          height: 22, 
+                                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.sports_soccer, size: 22, color: Colors.grey),
+                                        )
+                                      else 
+                                        const Icon(Icons.sports_soccer, size: 22, color: Colors.grey),
                                       const SizedBox(width: 8),
                                       Expanded(child: Text(m['home'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14), overflow: TextOverflow.ellipsis)),
                                       
-                                      // Középső állás / VS box
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
@@ -291,15 +324,23 @@ class _MainScreenState extends State<MainScreen> {
                                       const SizedBox(width: 8),
                                       Expanded(child: Text(m['away'], style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14), textAlign: TextAlign.end, overflow: TextOverflow.ellipsis)),
                                       const SizedBox(width: 8),
-                                      if (m['awayLogo'].isNotEmpty) Image.network(m['awayLogo'], width: 22, height: 22, errorWidget: (c, e, s) => const Icon(Icons.sports_soccer, size: 22)),
+                                      if (m['awayLogo'].isNotEmpty) 
+                                        Image.network(
+                                          m['awayLogo'], 
+                                          width: 22, 
+                                          height: 22, 
+                                          errorBuilder: (context, error, stackTrace) => const Icon(Icons.sports_soccer, size: 22, color: Colors.grey),
+                                        )
+                                      else 
+                                        const Icon(Icons.sports_soccer, size: 22, color: Colors.grey),
                                     ],
                                   ),
                                   subtitle: Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.between,
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text("⚽ ${m['league']}", style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                        Expanded(child: Text("⚽ ${m['league']}", style: const TextStyle(color: Colors.white38, fontSize: 11), overflow: TextOverflow.ellipsis)),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
@@ -352,7 +393,4 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
-}
-extension on Colors {
-  static get whiteBorders => Colors.white70;
 }
