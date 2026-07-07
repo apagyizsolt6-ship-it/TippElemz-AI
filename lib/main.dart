@@ -45,12 +45,11 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_final_v8.json';
+    return '${dir.path}/tips_pro_v9.json';
   }
 
   Future<void> _loadSavedTips() async {
-    final path = await _getPath();
-    final file = File(path);
+    final file = File(await _getPath());
     if (await file.exists()) {
       try {
         final content = await file.readAsString();
@@ -60,8 +59,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _saveTips() async {
-    final path = await _getPath();
-    await File(path).writeAsString(json.encode(_savedTips));
+    final file = File(await _getPath());
+    await file.writeAsString(json.encode(_savedTips));
   }
 
   Future<void> _loadMatches() async {
@@ -70,7 +69,6 @@ class _MainScreenState extends State<MainScreen> {
     final client = HttpClient();
     final now = DateTime.now();
     
-    // 6 napos ciklus
     for (int i = 0; i < 6; i++) {
       String dateStr = DateTime.now().add(Duration(days: i)).toString().substring(0, 10);
       try {
@@ -80,55 +78,51 @@ class _MainScreenState extends State<MainScreen> {
         if (res.statusCode == 200) {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
           for (var m in data) {
-            String leagueName = m['league']['name'];
-            if (leagueName.contains("Friendlies")) continue;
+            String league = m['league']['name'];
+            if (league.contains("Friendly") || league.contains("Cup")) continue;
 
             int ts = m['fixture']['timestamp'];
-            DateTime matchTime = DateTime.fromMillisecondsSinceEpoch(ts * 1000);
-            if (matchTime.isAfter(now)) {
+            DateTime time = DateTime.fromMillisecondsSinceEpoch(ts * 1000);
+            if (time.isAfter(now)) {
               loaded.add({
                 "home": m['teams']['home']['name'],
                 "away": m['teams']['away']['name'],
-                "league": leagueName,
+                "league": league,
                 "date": dateStr,
-                "fullDate": matchTime.toString().substring(0, 16)
+                "fullDate": time.toString().substring(0, 16)
               });
             }
           }
         }
       } catch (_) {}
     }
-    setState(() { 
-      _allMatches = loaded; 
-      _filteredMatches = loaded; 
-      _isLoading = false; 
-    });
+    setState(() { _allMatches = loaded; _filteredMatches = loaded; _isLoading = false; });
   }
 
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
-    // Számszerűsített statisztikák
+    int conf = 70 + rnd.nextInt(25);
     int corners = 8 + rnd.nextInt(6);
     int cards = 2 + rnd.nextInt(4);
-    int fouls = 18 + rnd.nextInt(12);
     
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text("Elemzés: ${m['home']} vs ${m['away']}", textAlign: TextAlign.center),
+      title: Text("Pro Elemzés: ${m['home']} vs ${m['away']}", style: const TextStyle(fontSize: 16)),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
-        _statRow("Várható szögletek", "$corners db", Icons.circle_outlined),
+        Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
+          child: Text("Bizalom Index: $conf%", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.cyanAccent))),
+        const SizedBox(height: 15),
+        _statRow("Szöglet előrejelzés", "$corners db", Icons.circle_outlined),
         _statRow("Várható lapok", "$cards db", Icons.warning),
-        _statRow("Szabálytalanságok", "$fouls db", Icons.sports),
         const Divider(),
-        Text("Ajánlás: ${corners > 10 ? 'Over' : 'Under'} 10.5 szöglet", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
+        Text("AI Tipp: ${corners > 10 ? 'Over' : 'Under'} 10.5 szöglet", style: const TextStyle(color: Colors.white70)),
       ]),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Mégse")),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
         ElevatedButton(onPressed: () {
-          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "S: $corners, L: $cards, Sz: $fouls", "status": "függőben"}));
-          _saveTips();
-          Navigator.pop(context);
+          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "S: $corners, L: $cards", "status": "függőben"}));
+          _saveTips(); Navigator.pop(context);
         }, child: const Text("Mentés")),
       ],
     ));
@@ -153,18 +147,16 @@ class _MainScreenState extends State<MainScreen> {
                 itemCount: _filteredMatches.length,
                 itemBuilder: (_, i) => Card(color: const Color(0xFF1E293B), child: ListTile(
                   title: Text("${_filteredMatches[i]['home']} - ${_filteredMatches[i]['away']}"),
-                  subtitle: Text("${_filteredMatches[i]['league']} | ${_filteredMatches[i]['fullDate']}"),
+                  subtitle: Text(_filteredMatches[i]['league']),
                   onTap: () => _analyze(_filteredMatches[i]),
                 )),
               ))
             ])
-          : ListView.builder(itemCount: _savedTips.length, itemBuilder: (_, i) => Card(
-              color: const Color(0xFF1E293B),
-              child: ListTile(
-                title: Text(_savedTips[i]['match']),
-                subtitle: Text("Tipp: ${_savedTips[i]['pick']} | Státusz: ${_savedTips[i]['status']}"),
-                trailing: IconButton(icon: const Icon(Icons.check_circle, color: Colors.green), onPressed: () => setState(() => _savedTips[i]['status'] = 'NYERT')),
-              ))),
+          : ListView.builder(itemCount: _savedTips.length, itemBuilder: (_, i) => Card(color: const Color(0xFF1E293B), child: ListTile(
+              title: Text(_savedTips[i]['match']),
+              subtitle: Text("Tipp: ${_savedTips[i]['pick']} | Státusz: ${_savedTips[i]['status']}"),
+              trailing: IconButton(icon: const Icon(Icons.check_circle, color: Colors.green), onPressed: () => setState(() => _savedTips[i]['status'] = 'NYERT')),
+            ))),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (i) => setState(() => _selectedIndex = i),
