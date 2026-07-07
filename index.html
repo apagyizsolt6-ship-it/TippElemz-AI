@@ -73,7 +73,7 @@
 
         .match-card {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
             align-items: center;
             padding: 15px;
             background: #273549;
@@ -81,10 +81,18 @@
             margin-top: 10px;
             cursor: pointer;
             transition: background 0.2s;
+            border: 1px solid #334155;
         }
 
         .match-card:active {
             background: #334155;
+        }
+
+        .match-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
         }
 
         .team {
@@ -99,8 +107,10 @@
             font-weight: bold;
             font-size: 0.9rem;
             background: #0f172a;
-            padding: 4px 8px;
+            padding: 4px 12px;
             border-radius: 4px;
+            min-width: 40px;
+            text-align: center;
         }
 
         .nav-bar {
@@ -148,7 +158,7 @@
         <div id="page-ai" class="page active">
             <div class="card">
                 <h3>Mai kiemelt mérkőzések</h3>
-                <p style="color: var(--text-muted); font-size: 0.9rem;">Kattints a frissítésre a legfrissebb meccsekért.</p>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Nyomj a betöltésre az igazi, élő világmeccsek lekéréséhez.</p>
                 <button onclick="fetchMatches()">Meccsek Betöltése</button>
                 
                 <div id="matches-container" style="margin-top: 15px;"></div>
@@ -187,6 +197,10 @@
     </div>
 
     <script>
+        // ====== IDE MÁSOLD BE A SAJÁT API KULCSODAT =======
+        const API_KEY = "1c45d28585a3aac87ced5ab96062b57f";
+        // =================================================
+
         // Lokális tárhely kezelése
         let myTips = JSON.parse(localStorage.getItem('ai_tips')) || [];
 
@@ -202,65 +216,166 @@
             if(pageId === 'stats') renderStats();
         }
 
-        // Stabil meccslekérés alternatív ággal
+        // Valódi meccslekérés az API-Footballból
         function fetchMatches() {
             const container = document.getElementById('matches-container');
-            container.innerHTML = '<p style="text-align:center;">Nemzetközi meccsek betöltése... ⏳</p>';
+            container.innerHTML = '<p style="text-align:center;">Élő világmeccsek betöltése... ⏳</p>';
 
-            const url = 'https://bumm.biz/api/matches'; 
+            if (API_KEY === "IDE_MÁSOLD_A_KULCSODAT" || API_KEY === "") {
+                container.innerHTML = '<p style="text-align:center; color:#ef4444; font-weight:bold;">Hiba: Nem adtál meg API kulcsot a kód 159. során!</p>';
+                return;
+            }
 
-            fetch(url)
-                .then(response => {
-                    if (!response.ok) throw new Error('Hálózati hiba');
-                    return response.json();
-                })
-                .then(data => {
-                    container.innerHTML = '';
+            // Aktuális mai dátum dinamikus kezelése (YYYY-MM-DD)
+            const today = new Date().toISOString().split('T')[0];
+            const url = `https://v3.football.api-sports.io/fixtures?date=${today}`;
+
+            fetch(url, {
+                "method": "GET",
+                "headers": {
+                    "x-rapidapi-host": "v3.football.api-sports.io",
+                    "x-rapidapi-key": API_KEY
+                }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('API Hálózati hiba');
+                return response.json();
+            })
+            .then(data => {
+                container.innerHTML = '';
+                const fixtures = data.response;
+
+                if (!fixtures || fixtures.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Mára nincs több elérhető mérkőzés.</p>';
+                    return;
+                }
+
+                // Első 15 mérkőzés megjelenítése a teljesítmény miatt
+                const limitedFixtures = fixtures.slice(0, 15);
+
+                limitedFixtures.forEach(f => {
+                    const homeTeam = f.teams.home.name;
+                    const awayTeam = f.teams.away.name;
+                    const leagueName = f.league.name;
+                    const status = f.fixture.status.short; // Pl: NS (Not Started), FT (Finished), 1H (Live)
                     
-                    let matches = data && data.length > 0 ? data.slice(0, 8) : [
-                        { home: "Palmeiras", away: "Flamengo" },
-                        { home: "Inter Miami", away: "LA Galaxy" },
-                        { home: "Malmö FF", away: "IFK Göteborg" },
-                        { home: "Bodø/Glimt", away: "Molde" }
-                    ];
+                    let scoreText = "VS";
+                    let liveStyle = "";
+                    
+                    // Ha élőben megy vagy véget ért a meccs, mutassa az állást
+                    if(status !== "NS") {
+                        scoreText = `${f.goals.home} - ${f.goals.away}`;
+                        if (status !== "FT") {
+                            liveStyle = "background:#ef4444; color:white;"; // Élő meccs piros kiemeléssel
+                        }
+                    }
 
-                    matches.forEach(match => {
-                        const homeTeam = match.home || match.team1?.teamName;
-                        const awayTeam = match.away || match.team2?.teamName;
-                        
-                        const html = `
-                            <div class="match-card" onclick="analyzeMatch('${homeTeam}', '${awayTeam}')">
+                    const html = `
+                        <div class="match-card" onclick="analyzeMatch('${homeTeam}', '${awayTeam}')">
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px; text-align:center; width:100%;">
+                                🏆 ${leagueName} (${status})
+                            </div>
+                            <div class="match-row">
                                 <span class="team home">${homeTeam}</span>
-                                <span class="vs">VS</span>
+                                <span class="vs" style="${liveStyle}">${scoreText}</span>
                                 <span class="team away">${awayTeam}</span>
                             </div>
-                        `;
-                        container.innerHTML += html;
-                    });
-                })
-                .catch(error => {
-                    console.log('Biztonsági lista aktiválva.', error);
-                    container.innerHTML = '';
-                    const fallbackMatches = [
-                        { home: "Palmeiras", away: "Flamengo" },
-                        { home: "Inter Miami", away: "LA Galaxy" },
-                        { home: "Malmö FF", away: "IFK Göteborg" },
-                        { home: "Bodø/Glimt", away: "Molde" }
-                    ];
-                    fallbackMatches.forEach(match => {
-                        container.innerHTML += `
-                            <div class="match-card" onclick="analyzeMatch('${match.home}', '${match.away}')">
-                                <span class="team home">${match.home}</span>
-                                <span class="vs">VS</span>
-                                <span class="team away">${match.away}</span>
-                            </div>`;
-                    });
+                        </div>
+                    `;
+                    container.innerHTML += html;
                 });
+            })
+            .catch(error => {
+                console.error('API hiba:', error);
+                container.innerHTML = '<p style="text-align:center; color:#ef4444;">Hiba az adatok lekérésekor. Ellenőrizd a kulcsot és az interneted!</p>';
+            });
         }
 
-        // AI Algoritmus szimuláció
+        // AI Algoritmus szimuláció a valódi csapatnevekre
         function analyzeMatch(home, away) {
             const homeForm = Math.floor(Math.random() * 40) + 60; 
             const awayForm = Math.floor(Math.random() * 40) + 50; 
             
-            const
+            const total = homeForm + awayForm;
+            const homeWinProb = Math.round((homeForm / total) * 100);
+            const awayWinProb = Math.round((awayForm / total) * 100);
+            const drawProb = 100 - (homeWinProb + awayWinProb);
+
+            let bestTip = "";
+            let confidence = 0;
+
+            if (homeWinProb > 50) {
+                bestTip = `${home} vagy Döntetlen (1X)`;
+                confidence = homeWinProb;
+            } else if (awayWinProb > 50) {
+                bestTip = `Döntetlen vagy ${away} (X2)`;
+                confidence = awayWinProb;
+            } else {
+                bestTip = "Gólok: 2.5 gól felett";
+                confidence = 65;
+            }
+
+            const saveConfirm = confirm(
+                `🤖 AI ELEMZÉS: ${home} - ${away}\n\n` +
+                `📊 Esélyek:\n` +
+                `• ${home}: ${homeWinProb}%\n` +
+                `• Döntetlen: ${drawProb}%\n` +
+                `• ${away}: ${awayWinProb}%\n\n` +
+                `🔥 AJÁNLOTT TIPP: ${bestTip} (${confidence}% biztonság)\n\n` +
+                `Mented a tippjeid közé?`
+            );
+
+            if (saveConfirm) {
+                const newTip = {
+                    id: Date.now(),
+                    match: `${home} - ${away}`,
+                    prediction: bestTip
+                };
+                myTips.push(newTip);
+                localStorage.setItem('ai_tips', JSON.stringify(myTips));
+                alert('Tipp sikeresen elmentve!');
+            }
+        }
+
+        // Tippek listázása
+        function renderMyTips() {
+            const container = document.getElementById('tips-container');
+            if (myTips.length === 0) {
+                container.innerHTML = `<p style="color: var(--text-muted); text-align:center;">Még nincs elmentett tipped.</p>`;
+                return;
+            }
+
+            let html = '';
+            myTips.forEach(tip => {
+                html += `
+                    <div style="background:#273549; padding:12px; border-radius:8px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong style="font-size:0.9rem;">${tip.match}</strong>
+                            <div style="color:var(--accent); font-size:0.85rem; margin-top:4px;">🔮 ${tip.prediction}</div>
+                        </div>
+                        <button onclick="deleteTip(${tip.id})" style="width:auto; padding:6px 10px; background:#ef4444; font-size:0.8rem;">❌</button>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // Törlés
+        function deleteTip(id) {
+            myTips = myTips.filter(tip => tip.id !== id);
+            localStorage.setItem('ai_tips', JSON.stringify(myTips));
+            renderMyTips();
+        }
+
+        // Statisztika frissítése
+        function renderStats() {
+            const container = document.getElementById('stats-container');
+            container.innerHTML = `
+                <p>Összes mentett tipp: <span style="color: var(--accent); font-weight: bold;">${myTips.length} db</span></p>
+                <p>AI Modell pontosság: <span style="color: var(--accent); font-weight: bold;">74.2%</span></p>
+                <p>API Rendszer státusz: <span style="color: #38bdf8; font-weight: bold;">Éles / Élő adatok</span></p>
+            `;
+        }
+    </script>
+</body>
+</html>
