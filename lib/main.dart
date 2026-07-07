@@ -37,10 +37,10 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    _initData();
+    _initEverything();
   }
 
-  Future<void> _initData() async {
+  Future<void> _initEverything() async {
     await _loadSavedTips();
     await _loadMatches();
   }
@@ -51,12 +51,19 @@ class _MainScreenState extends State<MainScreen> {
     final file = File(await _getPath());
     if (await file.exists()) {
       try {
-        setState(() => _savedTips = List<Map<String, dynamic>>.from(json.decode(await file.readAsString())));
+        final content = await file.readAsString();
+        final List<dynamic> decoded = json.decode(content);
+        setState(() {
+          _savedTips = List<Map<String, dynamic>>.from(decoded);
+        });
       } catch (_) {}
     }
   }
 
-  Future<void> _saveTips() async => await File(await _getPath()).writeAsString(json.encode(_savedTips));
+  Future<void> _saveTips() async {
+    final file = File(await _getPath());
+    await file.writeAsString(json.encode(_savedTips));
+  }
 
   Future<void> _loadMatches() async {
     setState(() => _isLoading = true);
@@ -98,7 +105,8 @@ class _MainScreenState extends State<MainScreen> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
         ElevatedButton(onPressed: () {
           setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "$hG-$aG", "status": "pending"}));
-          _saveTips(); Navigator.pop(context);
+          _saveTips(); 
+          Navigator.pop(context);
         }, child: const Text("Mentés")),
       ],
     ));
