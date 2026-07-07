@@ -38,8 +38,13 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedTips();
-    _loadMatches();
+    _initData();
+  }
+
+  // Aszinkron inicializálás, hogy az await ne okozzon build hibát
+  Future<void> _initData() async {
+    await _loadSavedTips();
+    await _loadMatches();
   }
 
   Future<String> _getPath() async => (await getApplicationDocumentsDirectory()).path + '/tips_pro.json';
@@ -47,13 +52,19 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _loadSavedTips() async {
     final file = File(await _getPath());
     if (await file.exists()) {
-      setState(() => _savedTips = List<Map<String, dynamic>>.from(json.decode(await file.readAsString())));
+      try {
+        final content = await file.readAsString();
+        setState(() => _savedTips = List<Map<String, dynamic>>.from(json.decode(content)));
+      } catch (e) {
+        debugPrint("Hiba a mentett fájl olvasásakor: $e");
+      }
     }
   }
 
-  Future<void> _saveTips() async => await File(await _getPath()).writeAsString(json.encode(_savedTips));
+  Future<void> _saveTips() async {
+    await File(await _getPath()).writeAsString(json.encode(_savedTips));
+  }
 
-  // --- PRO ADATLEHÍVÁS (6 NAP) ---
   Future<void> _loadMatches() async {
     setState(() => _isLoading = true);
     List<Map<String, dynamic>> loaded = [];
@@ -63,6 +74,7 @@ class _MainScreenState extends State<MainScreen> {
         String date = DateTime.now().add(Duration(days: i)).toString().substring(0, 10);
         var req = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?date=$date'));
         req.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f');
+        req.headers.add('x-rapidapi-host', 'v3.football.api-sports.io');
         var res = await req.close();
         if (res.statusCode == 200) {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
@@ -76,14 +88,14 @@ class _MainScreenState extends State<MainScreen> {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint("API Hiba: $e");
+    }
     setState(() { _allMatches = loaded; _isLoading = false; });
   }
 
-  // --- PRO ELEMZŐ MOTOR ---
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
-    // Pro statisztikai súlyozás
     double leagueMult = m['league'].toString().toLowerCase().contains('premier') ? 1.5 : 1.1;
     int hG = (rnd.nextInt(3) * leagueMult).toInt();
     int aG = (rnd.nextInt(3) * leagueMult).toInt();
@@ -95,9 +107,8 @@ class _MainScreenState extends State<MainScreen> {
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Text("AI Elemzés: ${m['league']}", style: const TextStyle(fontSize: 12, color: Colors.white54)),
         const SizedBox(height: 10),
-        Text("Várható eredmény: $hG-$aG", style: const TextStyle(fontSize: 20, color: Colors.greenAccent)),
-        const SizedBox(height: 5),
-        Text("Modell megbízhatóság: $conf%", style: const TextStyle(color: Colors.amber)),
+        Text("Várható: $hG-$aG", style: const TextStyle(fontSize: 20, color: Colors.greenAccent)),
+        Text("Megbízhatóság: $conf%", style: const TextStyle(color: Colors.amber)),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
@@ -118,7 +129,7 @@ class _MainScreenState extends State<MainScreen> {
             itemCount: _allMatches.length, 
             itemBuilder: (_, i) => ListTile(
               title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
-              subtitle: Text(_allMatches[i]['league']),
+              subtitle: Text("${_allMatches[i]['league']} | ${_allMatches[i]['date']}"),
               onTap: () => _analyze(_allMatches[i])
             )
           )
