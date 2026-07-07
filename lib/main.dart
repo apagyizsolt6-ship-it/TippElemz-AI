@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF080C14), // Még mélyebb, modernebb sötét
+        scaffoldBackgroundColor: const Color(0xFF080C14),
         cardColor: const Color(0xFF111827),
         fontFamily: 'Roboto',
       ),
@@ -207,7 +207,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // --- MATEMATIKAI ALGORITMUS ÉS CYBER-VISUALS ---
+  // --- MATEMATIKAI ALGORITMUS MOTOR ---
   void _analyzeMatch(Map<String, dynamic> match) {
     final String home = match['home'];
     final String away = match['away'];
@@ -253,10 +253,10 @@ class _MainScreenState extends State<MainScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A), // Sötétebb kiber-háttér
+        backgroundColor: const Color(0xFF0F172A),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: Color(0xFF334155), width: 1.5), // Prémium keret
+          side: const BorderSide(color: Color(0xFF334155), width: 1.5),
         ),
         title: Column(
           children: [
@@ -287,7 +287,7 @@ class _MainScreenState extends State<MainScreen> {
                   Text(conf, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 18)),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               LinearProgressIndicator(
                 value: confBase / 100.0,
                 backgroundColor: Colors.white10,
@@ -335,12 +335,11 @@ class _MainScreenState extends State<MainScreen> {
     return k - 1;
   }
 
-  // ÚJ VIZUÁLIS MEGJELENÍTÉSI METÓDUS HALADÁSI SÁVVAL
   Widget _buildVisualAnalysisRow(String title, String value, Color themeColor, double progressValue) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        cross CrossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -349,12 +348,12 @@ class _MainScreenState extends State<MainScreen> {
               Text(value, style: TextStyle(color: themeColor, fontWeight: FontWeight.bold, fontSize: 13)),
             ],
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 8), 
           LinearProgressIndicator(
             value: progressValue,
             backgroundColor: Colors.white10,
             color: themeColor.withOpacity(0.8),
-            minHeight: 4,
+            minHeight: 5,
             borderRadius: BorderRadius.circular(2),
           ),
         ],
@@ -412,7 +411,7 @@ class _MainScreenState extends State<MainScreen> {
                       hintStyle: const TextStyle(color: Colors.white30, fontSize: 14),
                       prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
                       filled: true,
-                      fillColor: const Color(0xFF1E293B).withOpacity(0.6), // Üveg hatású beviteli mező
+                      fillColor: const Color(0xFF1E293B).withOpacity(0.6), 
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(color: Colors.white10),
