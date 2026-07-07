@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF080C14),
-        cardColor: const Color(0xFF111827),
+        primaryColor: const Color(0xFF10B981),
       ),
       home: const MainScreen(),
     );
@@ -45,24 +45,20 @@ class _MainScreenState extends State<MainScreen> {
     await _loadMatches();
   }
 
-  Future<String> _getPath() async => (await getApplicationDocumentsDirectory()).path + '/tips_final.json';
+  Future<String> _getPath() async => (await getApplicationDocumentsDirectory()).path + '/tips_pro_v3.json';
 
   Future<void> _loadSavedTips() async {
     final file = File(await _getPath());
     if (await file.exists()) {
       try {
         final content = await file.readAsString();
-        final List<dynamic> decoded = json.decode(content);
-        setState(() {
-          _savedTips = List<Map<String, dynamic>>.from(decoded);
-        });
+        setState(() => _savedTips = List<Map<String, dynamic>>.from(json.decode(content)));
       } catch (_) {}
     }
   }
 
   Future<void> _saveTips() async {
-    final file = File(await _getPath());
-    await file.writeAsString(json.encode(_savedTips));
+    await File(await _getPath()).writeAsString(json.encode(_savedTips));
   }
 
   Future<void> _loadMatches() async {
@@ -91,23 +87,32 @@ class _MainScreenState extends State<MainScreen> {
     setState(() { _allMatches = loaded; _isLoading = false; });
   }
 
+  // --- ELEGÁNS ELEMZŐ ABLAK ---
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
     int hG = rnd.nextInt(3), aG = rnd.nextInt(3), conf = 75 + rnd.nextInt(20);
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
-      title: Text("${m['home']} - ${m['away']}", textAlign: TextAlign.center),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text("${m['home']}\nvs\n${m['away']}", textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text("Várható eredmény: $hG-$aG", style: const TextStyle(fontSize: 18, color: Colors.greenAccent)),
-        Text("Megbízhatóság: $conf%", style: const TextStyle(color: Colors.amber)),
+        const Divider(color: Colors.white24),
+        Text("Várható: $hG-$aG", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+        const SizedBox(height: 10),
+        Text("Megbízhatóság: $conf%", style: const TextStyle(color: Colors.amber, fontSize: 16)),
       ]),
+      actionsAlignment: MainAxisAlignment.center,
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
-        ElevatedButton(onPressed: () {
-          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "$hG-$aG", "status": "pending"}));
-          _saveTips(); 
-          Navigator.pop(context);
-        }, child: const Text("Mentés")),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+          onPressed: () {
+            setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "$hG-$aG", "status": "pending"}));
+            _saveTips(); 
+            Navigator.pop(context);
+          }, 
+          child: const Text("Tipp mentése")
+        ),
       ],
     ));
   }
@@ -115,35 +120,41 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO")),
+      appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO"), centerTitle: true, backgroundColor: Colors.transparent, elevation: 0),
       body: _selectedIndex == 0
           ? _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
+              padding: const EdgeInsets.only(top: 10),
               itemCount: _allMatches.length,
-              itemBuilder: (_, i) => Card(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              itemBuilder: (_, i) => Container(
+                margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                decoration: BoxDecoration(color: const Color(0xFF111827), borderRadius: BorderRadius.circular(15)),
                 child: ListTile(
-                  title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
-                  subtitle: Text("${_allMatches[i]['league']} • ${_allMatches[i]['date']}"),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                  title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text("${_allMatches[i]['league']} | ${_allMatches[i]['date']}", style: const TextStyle(color: Colors.white54)),
                   onTap: () => _analyze(_allMatches[i]),
                 ),
               ),
             )
           : Column(children: [
-              Padding(padding: const EdgeInsets.all(20), child: Text("Találati arány: ${(_savedTips.where((t)=>t['status']=='won').length / (_savedTips.isEmpty?1:_savedTips.length)*100).toStringAsFixed(1)}%")),
-              Expanded(child: ListView.builder(itemCount: _savedTips.length, itemBuilder: (_, i) => Card(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              Padding(padding: const EdgeInsets.all(20), child: Text("Teljes találati arány: ${(_savedTips.where((t)=>t['status']=='won').length / (_savedTips.isEmpty?1:_savedTips.length)*100).toStringAsFixed(1)}%", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              Expanded(child: ListView.builder(itemCount: _savedTips.length, itemBuilder: (_, i) => Container(
+                margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                decoration: BoxDecoration(color: const Color(0xFF111827), borderRadius: BorderRadius.circular(10)),
                 child: ListTile(
                   title: Text(_savedTips[i]['match']),
-                  subtitle: Text("Tipp: ${_savedTips[i]['pick']}"),
+                  subtitle: Text("Tipp: ${_savedTips[i]['pick']} | Státusz: ${_savedTips[i]['status']}"),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                    IconButton(icon: const Icon(Icons.check, color: Colors.green), onPressed: () { setState(() => _savedTips[i]['status']='won'); _saveTips(); }),
-                    IconButton(icon: const Icon(Icons.close, color: Colors.red), onPressed: () { setState(() => _savedTips[i]['status']='lost'); _saveTips(); }),
+                    IconButton(icon: const Icon(Icons.check_circle, color: Colors.green), onPressed: () { setState(() => _savedTips[i]['status']='won'); _saveTips(); }),
+                    IconButton(icon: const Icon(Icons.cancel, color: Colors.red), onPressed: () { setState(() => _savedTips[i]['status']='lost'); _saveTips(); }),
                   ]),
                 ),
               ))),
             ]),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
+        backgroundColor: const Color(0xFF080C14),
+        selectedItemColor: Colors.greenAccent,
         onTap: (i) => setState(() => _selectedIndex = i),
         items: const [BottomNavigationBarItem(icon: Icon(Icons.analytics), label: "Elemzés"), BottomNavigationBarItem(icon: Icon(Icons.history), label: "Profit")],
       ),
