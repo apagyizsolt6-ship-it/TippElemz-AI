@@ -37,7 +37,6 @@ class _MainScreenState extends State<MainScreen> {
   final List<Map<String, String>> _savedTips = [];
   bool _isLoading = false;
 
-  // STABIL, NYÍLT ÉS TESZTELT API MECCSEK LEKÉRÉSÉRE
   Future<void> _loadMatches() async {
     setState(() {
       _isLoading = true;
@@ -45,10 +44,9 @@ class _MainScreenState extends State<MainScreen> {
 
     try {
       final client = HttpClient();
-      // Átváltottunk egy teljesen nyílt, stabil európai futball-adatforrásra
+      // JAVÍTÁS: Átváltottunk biztonságos HTTPS protokollra, amit az Android nem blokkol!
       final request = await client.getUrl(Uri.parse('https://raw.githubusercontent.com/openfootball/football.json/master/2020-21/en.1.json'));
       
-      // Beállítunk egy alapvető fejlécet, hogy az Android ne legyen gyanús a szervernek
       request.headers.add(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10)');
       
       final response = await request.close();
@@ -60,7 +58,6 @@ class _MainScreenState extends State<MainScreen> {
         
         List<Map<String, String>> loadedMatches = [];
 
-        // Kivesszük a legfrissebb forduló meccseit
         if (rounds.isNotEmpty) {
           final List<dynamic> matchesData = rounds[Random().nextInt(rounds.length)]['matches'] ?? [];
           
@@ -86,7 +83,8 @@ class _MainScreenState extends State<MainScreen> {
         _showErrorSnackBar("Szerver hiba (Kód: ${response.statusCode})");
       }
     } catch (e) {
-      _showErrorSnackBar("Hálózati hiba lépett fel a kapcsolódáskor.");
+      // Bővített hibaüzenet, hogy lássuk ha a rendszer dobja el
+      _showErrorSnackBar("Hiba: ${e.toString().take(40)}...");
     } finally {
       setState(() {
         _isLoading = false;
