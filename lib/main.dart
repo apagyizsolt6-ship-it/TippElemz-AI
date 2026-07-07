@@ -44,11 +44,11 @@ class _MainScreenState extends State<MainScreen> {
 
     try {
       final client = HttpClient();
-      // Az API-Football hivatalos végpontja (Angol Premier League következő meccsei)
-      final request = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?league=39&season=2026&next=10'));
+      // JAVÍTÁS: A live=all végpont lekéri a világon jelenleg zajló összes élő meccset
+      final request = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?live=all'));
       
-      // Kötelező hitelesítési fejlécek az API felé
-      request.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f'); // <--- IDE MÁSOLD BE A KULCSODAT!
+      // Kötelező hitelesítési fejlécek a te saját API kulcsoddal
+      request.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f'); 
       request.headers.add('x-rapidapi-host', 'v3.football.api-sports.io');
       request.headers.add(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 10)');
       
@@ -70,8 +70,8 @@ class _MainScreenState extends State<MainScreen> {
           loadedMatches.add({
             "home": homeTeam,
             "away": awayTeam,
-            "league": "🇬🇧 $leagueName",
-            "time": "Következő forduló",
+            "league": "⚽ $leagueName",
+            "time": "Élő Meccs",
             "conf": randomConf
           });
         }
