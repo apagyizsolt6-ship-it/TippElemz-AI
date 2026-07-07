@@ -23,6 +23,21 @@ jobs:
       with:
         channel: 'stable'
 
+    - name: Recreate Android Project Files
+      run: |
+        # Ideiglenesen kimentjük a kódunkat, hogy a create ne írja felül
+        mkdir - backup_lib
+        cp -r lib/* backup_lib/ || true
+        cp pubspec.yaml backup_pubspec.yaml || true
+        
+        # Legeneráljuk a teljes projektstruktúrát az Android mappával együtt
+        flutter create --org com.tippelemzo --project-name ai_tippelemzo_pro .
+        
+        # Visszamásoljuk a saját logikánkat
+        rm -rf lib
+        mv backup_lib lib
+        mv backup_pubspec.yaml pubspec.yaml
+
     - name: Install dependencies
       run: flutter pub get
 
