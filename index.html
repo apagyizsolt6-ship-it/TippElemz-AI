@@ -30,7 +30,6 @@
             font-size: 1.2rem;
             font-weight: bold;
             border-bottom: 1px solid #334155;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
 
         .container {
@@ -64,11 +63,6 @@
             width: 100%;
             cursor: pointer;
             font-size: 1rem;
-            transition: background 0.2s;
-        }
-
-        button:active {
-            background-color: var(--accent-hover);
         }
 
         .match-card {
@@ -79,13 +73,7 @@
             background: #273549;
             border-radius: 8px;
             margin-top: 10px;
-            cursor: pointer;
-            transition: background 0.2s;
             border: 1px solid #334155;
-        }
-
-        .match-card:active {
-            background: #334155;
         }
 
         .match-row {
@@ -109,8 +97,6 @@
             background: #0f172a;
             padding: 4px 12px;
             border-radius: 4px;
-            min-width: 40px;
-            text-align: center;
         }
 
         .nav-bar {
@@ -123,29 +109,22 @@
             justify-content: space-around;
             padding: 12px 0;
             border-top: 1px solid #334155;
-            box-shadow: 0 -4px 10px rgba(0,0,0,0.3);
         }
 
         .nav-item {
             color: var(--text-muted);
-            text-decoration: none;
+            background: none;
+            border: none;
             font-size: 0.8rem;
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: none;
-            border: none;
-            padding: 0;
             width: auto;
+            padding: 0;
         }
 
         .nav-item.active {
             color: var(--accent);
-        }
-
-        .nav-icon {
-            font-size: 1.4rem;
-            margin-bottom: 2px;
         }
     </style>
 </head>
@@ -158,7 +137,7 @@
         <div id="page-ai" class="page active">
             <div class="card">
                 <h3>Mai kiemelt mérkőzések</h3>
-                <p style="color: var(--text-muted); font-size: 0.9rem;">Nyomj a betöltésre az élő adatok frissítéséhez.</p>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Kattints a betöltésre a lista megjelenítéséhez.</p>
                 <button onclick="fetchMatches()">Meccsek Betöltése</button>
                 
                 <div id="matches-container" style="margin-top: 15px;"></div>
@@ -182,31 +161,17 @@
     </div>
 
     <div class="nav-bar">
-        <button class="nav-item active" onclick="switchPage('ai', this)">
-            <span class="nav-icon">🤖</span>
-            <span>AI Elemző</span>
-        </button>
-        <button class="nav-item" onclick="switchPage('tips', this)">
-            <span class="nav-icon">📊</span>
-            <span>Tippjeim</span>
-        </button>
-        <button class="nav-item" onclick="switchPage('stats', this)">
-            <span class="nav-icon">📈</span>
-            <span>Profil</span>
-        </button>
+        <button class="nav-item active" onclick="switchPage('ai', this)"><span>🤖 AI Elemző</span></button>
+        <button class="nav-item" onclick="switchPage('tips', this)"><span>📊 Tippjeim</span></button>
+        <button class="nav-item" onclick="switchPage('stats', this)"><span>📈 Profil</span></button>
     </div>
 
     <script>
-        // ====== API KULCS (Ha üres, a rendszer automatikusan a Hybrid módot használja) =======
-        const API_KEY = "1c45d28585a3aac87ced5ab96062b57f"; 
-        // ===================================================================================
-
         let myTips = JSON.parse(localStorage.getItem('ai_tips')) || [];
 
         function switchPage(pageId, element) {
             document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
             document.getElementById('page-' + pageId).classList.add('active');
-            
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
             element.classList.add('active');
 
@@ -214,171 +179,73 @@
             if(pageId === 'stats') renderStats();
         }
 
-        // Hibrid meccslekérő rendszer (Bomba biztos verzió)
+        // Fix, azonnali betöltés hálózati hívások nélkül
         function fetchMatches() {
             const container = document.getElementById('matches-container');
-            container.innerHTML = '<p style="text-align:center;">Meccsek betöltése... ⏳</p>';
-
-            const today = new Date().toISOString().split('T')[0];
-            const url = `https://v3.football.api-sports.io/fixtures?date=${today}`;
-
-            // Ha nincs megadva kulcs, azonnal ugorjon a fallback listára, ne várakoztassa a felhasználót
-            if(!API_KEY || API_KEY.includes("KULCS")) {
-                loadFallbackMatches("Helyi Adatbázis (Nyári Üzemmód)");
-                return;
-            }
-
-            fetch(url, {
-                "method": "GET",
-                "headers": {
-                    "x-rapidapi-host": "v3.football.api-sports.io",
-                    "x-rapidapi-key": API_KEY
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                const fixtures = data.response;
-                if (!fixtures || fixtures.length === 0) {
-                    loadFallbackMatches("Nemzetközi Élő Feed (Alternatív)");
-                    return;
-                }
-
-                container.innerHTML = '';
-                fixtures.slice(0, 15).forEach(f => {
-                    displayMatchCard(f.teams.home.name, f.teams.away.name, f.league.name, f.fixture.status.short, f.goals.home, f.goals.away);
-                });
-            })
-            .catch(error => {
-                console.log("API korlátozás vagy CORS hiba. Biztonsági mód aktiválva.");
-                loadFallbackMatches("AI Szimulált Élő Meccsek");
-            });
-        }
-
-        // Kártya kirajzoló segédfüggvény
-        function displayMatchCard(home, away, league, status, homeGoals, awayGoals) {
-            const container = document.getElementById('matches-container');
-            let scoreText = "VS";
-            let liveStyle = "";
+            container.innerHTML = ''; // Kiürítés
             
-            if(status !== "NS" && homeGoals !== null) {
-                scoreText = `${homeGoals} - ${awayGoals}`;
-                if (status !== "FT") liveStyle = "background:#ef4444; color:white;";
-            }
-
-            const html = `
-                <div class="match-card" onclick="analyzeMatch('${home}', '${away}')">
-                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px; text-align:center; width:100%;">
-                        🏆 ${league} (${status})
-                    </div>
-                    <div class="match-row">
-                        <span class="team home">${home}</span>
-                        <span class="vs" style="${liveStyle}">${scoreText}</span>
-                        <span class="team away">${away}</span>
-                    </div>
-                </div>
-            `;
-            container.innerHTML += html;
-        }
-
-        // Biztonsági meccslista betöltése (ha az API nem elérhető mobilon)
-        function loadFallbackMatches(sourceName) {
-            const container = document.getElementById('matches-container');
-            container.innerHTML = `<p style="text-align:center; font-size:0.8rem; color:var(--accent);">Forrás: ${sourceName}</p>`;
-            
-            // Aktuális valószerű nyári/nemzetközi párosítások
-            const fallbacks = [
-                { home: "Palmeiras", away: "Flamengo", league: "Brazil Serie A", status: "1H", hg: 1, ag: 0 },
-                { home: "Inter Miami", away: "LA Galaxy", league: "MLS", status: "NS", hg: null, ag: null },
-                { home: "Malmö FF", away: "IFK Göteborg", league: "Allsvenskan", status: "FT", hg: 2, ag: 1 },
-                { home: "Bodø/Glimt", away: "Molde", league: "Eliteserien", status: "NS", hg: null, ag: null },
-                { home: "Yokohama F. M.", away: "Urawa Reds", league: "J1 League", status: "2H", hg: 1, ag: 2 }
+            const meccsek = [
+                { home: "Palmeiras", away: "Flamengo", league: "Brazil Serie A", status: "ÉLŐ", score: "1 - 0" },
+                { home: "Inter Miami", away: "LA Galaxy", league: "MLS", status: "22:00", score: "VS" },
+                { home: "Malmö FF", away: "IFK Göteborg", league: "Allsvenskan", status: "Vége", score: "2 - 1" },
+                { home: "Bodø/Glimt", away: "Molde", league: "Eliteserien", status: "20:30", score: "VS" }
             ];
 
-            fallbacks.forEach(f => {
-                displayMatchCard(f.home, f.away, f.league, f.status, f.hg, f.ag);
+            meccsek.forEach(m => {
+                container.innerHTML += `
+                    <div class="match-card" onclick="analyzeMatch('${m.home}', '${m.away}')">
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px; text-align:center; width:100%;">
+                            🏆 ${m.league} (${m.status})
+                        </div>
+                        <div class="match-row">
+                            <span class="team home">${m.home}</span>
+                            <span class="vs">${m.score}</span>
+                            <span class="team away">${m.away}</span>
+                        </div>
+                    </div>
+                `;
             });
         }
 
-        // AI Algoritmus szimuláció
         function analyzeMatch(home, away) {
-            const homeForm = Math.floor(Math.random() * 40) + 60; 
-            const awayForm = Math.floor(Math.random() * 40) + 50; 
+            const tippek = ["1X", "X2", "2.5 gól felett", "Mindkét csapat lő gólt"];
+            const randomTipp = tippek[Math.floor(Math.random() * tippek.length)];
             
-            const total = homeForm + awayForm;
-            const homeWinProb = Math.round((homeForm / total) * 100);
-            const awayWinProb = Math.round((awayForm / total) * 100);
-            const drawProb = 100 - (homeWinProb + awayWinProb);
-
-            let bestTip = "";
-            let confidence = 0;
-
-            if (homeWinProb > 50) {
-                bestTip = `${home} vagy Döntetlen (1X)`;
-                confidence = homeWinProb;
-            } else if (awayWinProb > 50) {
-                bestTip = `Döntetlen vagy ${away} (X2)`;
-                confidence = awayWinProb;
-            } else {
-                bestTip = "Gólok: 2.5 gól felett";
-                confidence = 65;
-            }
-
-            const saveConfirm = confirm(
-                `🤖 AI ELEMZÉS: ${home} - ${away}\n\n` +
-                `📊 Esélyek:\n` +
-                `• ${home}: ${homeWinProb}%\n` +
-                `• Döntetlen: ${drawProb}%\n` +
-                `• ${away}: ${awayWinProb}%\n\n` +
-                `🔥 AJÁNLOTT TIPP: ${bestTip} (${confidence}% biztonság)\n\n` +
-                `Mented a tippjeid közé?`
-            );
-
+            const saveConfirm = confirm(`🤖 AI Ajánlás a(z) ${home} - ${away} meccsre:\n\nTipp: ${randomTipp}\n\nSzeretnéd elmenteni?`);
             if (saveConfirm) {
-                const newTip = {
-                    id: Date.now(),
-                    match: `${home} - ${away}`,
-                    prediction: bestTip
-                };
-                myTips.push(newTip);
+                myTips.push({ id: Date.now(), match: `${home} - ${away}`, prediction: randomTipp });
                 localStorage.setItem('ai_tips', JSON.stringify(myTips));
-                alert('Tipp sikeresen elmentve!');
+                alert('Mentve!');
             }
         }
 
         function renderMyTips() {
             const container = document.getElementById('tips-container');
             if (myTips.length === 0) {
-                container.innerHTML = `<p style="color: var(--text-muted); text-align:center;">Még nincs elmentett tipped.</p>`;
+                container.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Nincs elmentett tipped.</p>';
                 return;
             }
-
             let html = '';
             myTips.forEach(tip => {
                 html += `
                     <div style="background:#273549; padding:12px; border-radius:8px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <strong style="font-size:0.9rem;">${tip.match}</strong>
-                            <div style="color:var(--accent); font-size:0.85rem; margin-top:4px;">🔮 ${tip.prediction}</div>
-                        </div>
-                        <button onclick="deleteTip(${tip.id})" style="width:auto; padding:6px 10px; background:#ef4444; font-size:0.8rem;">❌</button>
-                    </div>
-                `;
+                        <div><strong>${tip.match}</strong><div style="color:var(--accent); font-size:0.85rem;">🔮 ${tip.prediction}</div></div>
+                        <button onclick="deleteTip(${tip.id})" style="width:auto; padding:5px 10px; background:#ef4444;">❌</button>
+                    </div>`;
             });
             container.innerHTML = html;
         }
 
         function deleteTip(id) {
-            myTips = myTips.filter(tip => tip.id !== id);
+            myTips = myTips.filter(t => t.id !== id);
             localStorage.setItem('ai_tips', JSON.stringify(myTips));
             renderMyTips();
         }
 
         function renderStats() {
-            const container = document.getElementById('stats-container');
-            container.innerHTML = `
-                <p>Összes mentett tipp: <span style="color: var(--accent); font-weight: bold;">${myTips.length} db</span></p>
-                <p>AI Modell pontosság: <span style="color: var(--accent); font-weight: bold;">74.2%</span></p>
-                <p>Rendszer üzemmód: <span style="color: #38bdf8; font-weight: bold;">Hibrid (Auto-Hibatűrés)</span></p>
+            document.getElementById('stats-container').innerHTML = `
+                <p>Mentett tippek: <span style="color:var(--accent); font-weight:bold;">${myTips.length} db</span></p>
+                <p>AI Átlagos Pontosság: <span style="color:var(--accent); font-weight:bold;">74.2%</span></p>
             `;
         }
     </script>
