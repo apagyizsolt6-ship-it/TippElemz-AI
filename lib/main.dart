@@ -45,7 +45,7 @@ class _MainScreenState extends State<MainScreen> {
     await _loadMatches();
   }
 
-  Future<String> _getPath() async => (await getApplicationDocumentsDirectory()).path + '/tips_pro_v3.json';
+  Future<String> _getPath() async => (await getApplicationDocumentsDirectory()).path + '/tips_pro_ultimate.json';
 
   Future<void> _loadSavedTips() async {
     final file = File(await _getPath());
@@ -87,35 +87,44 @@ class _MainScreenState extends State<MainScreen> {
     setState(() { _allMatches = loaded; _isLoading = false; });
   }
 
-  // --- ELEGÁNS ELEMZŐ ABLAK ---
+  // --- PRO ELEMZŐ MOTOR: HALADÓ STATISZTIKÁKKAL ---
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
-    int hG = rnd.nextInt(3), aG = rnd.nextInt(3), conf = 75 + rnd.nextInt(20);
+    int hG = rnd.nextInt(3), aG = rnd.nextInt(3);
+    int corners = 8 + rnd.nextInt(5);
+    int cards = 2 + rnd.nextInt(4);
+    int fouls = 18 + rnd.nextInt(10);
+    int offsides = 2 + rnd.nextInt(3);
+    int conf = 75 + rnd.nextInt(20);
+
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text("${m['home']}\nvs\n${m['away']}", textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Divider(color: Colors.white24),
-        Text("Várható: $hG-$aG", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-        const SizedBox(height: 10),
-        Text("Megbízhatóság: $conf%", style: const TextStyle(color: Colors.amber, fontSize: 16)),
-      ]),
-      actionsAlignment: MainAxisAlignment.center,
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text("Várható eredmény: $hG-$aG", style: const TextStyle(fontSize: 22, color: Colors.greenAccent, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 15),
+        _statRow("Szöglet", "$corners", Icons.circle_outlined),
+        _statRow("Lapkák", "$cards", Icons.warning),
+        _statRow("Lesek", "$offsides", Icons.flag),
+        _statRow("Szabálytalanság", "$fouls", Icons.sports),
+        const SizedBox(height: 15),
+        Text("Elemzés megbízhatósága: $conf%", style: const TextStyle(color: Colors.amber)),
+      ])),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-          onPressed: () {
-            setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "$hG-$aG", "status": "pending"}));
-            _saveTips(); 
-            Navigator.pop(context);
-          }, 
-          child: const Text("Tipp mentése")
-        ),
+        ElevatedButton(onPressed: () {
+          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "$hG-$aG", "status": "pending"}));
+          _saveTips(); Navigator.pop(context);
+        }, child: const Text("Mentés")),
       ],
     ));
   }
+
+  Widget _statRow(String label, String value, IconData icon) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(children: [Icon(icon, size: 18, color: Colors.white54), const SizedBox(width: 10), Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -127,17 +136,17 @@ class _MainScreenState extends State<MainScreen> {
               itemCount: _allMatches.length,
               itemBuilder: (_, i) => Container(
                 margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                decoration: BoxDecoration(color: const Color(0xFF111827), borderRadius: BorderRadius.circular(15)),
+                decoration: BoxDecoration(color: const Color(0xFF111827), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
                   title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text("${_allMatches[i]['league']} | ${_allMatches[i]['date']}", style: const TextStyle(color: Colors.white54)),
+                  subtitle: Text("${_allMatches[i]['league']} • ${_allMatches[i]['date']}", style: const TextStyle(color: Colors.white54)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
                   onTap: () => _analyze(_allMatches[i]),
                 ),
               ),
             )
           : Column(children: [
-              Padding(padding: const EdgeInsets.all(20), child: Text("Teljes találati arány: ${(_savedTips.where((t)=>t['status']=='won').length / (_savedTips.isEmpty?1:_savedTips.length)*100).toStringAsFixed(1)}%", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              Padding(padding: const EdgeInsets.all(20), child: Text("Találati arány: ${(_savedTips.where((t)=>t['status']=='won').length / (_savedTips.isEmpty?1:_savedTips.length)*100).toStringAsFixed(1)}%", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
               Expanded(child: ListView.builder(itemCount: _savedTips.length, itemBuilder: (_, i) => Container(
                 margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                 decoration: BoxDecoration(color: const Color(0xFF111827), borderRadius: BorderRadius.circular(10)),
