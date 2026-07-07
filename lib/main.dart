@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:io';
 
 void main() {
   runApp(const MyApp());
@@ -37,25 +37,25 @@ class _MainScreenState extends State<MainScreen> {
   final List<Map<String, String>> _savedTips = [];
   bool _isLoading = false;
 
-  // ÉLŐ MECCSEK LEKÉRÉSE AZ INTERNETRŐL
+  // JAVÍTOTT LEKÉRÉS KÜLSŐ CSOMAG NÉLKÜL
   Future<void> _loadMatches() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Egy ingyenes, regisztráció nélküli futball API-t hívunk meg
-      final response = await http.get(Uri.parse('https://api.scorebat.com/video-api/v3/'));
+      final client = HttpClient();
+      final request = await client.getUrl(Uri.parse('https://api.scorebat.com/video-api/v3/'));
+      final response = await request.close();
       
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body)['response'];
+        final responseBody = await response.transform(utf8.decoder).join();
+        final List<dynamic> data = json.decode(responseBody)['response'];
         List<Map<String, String>> loadedMatches = [];
 
-        // Kiválasztunk max 8 aktuális meccset a listából
         for (var item in data.take(8)) {
           final title = item['title'].toString().split(' - ');
           if (title.length == 2) {
-            // Véletlenszerű generálás az AI biztonsági szintnek (70% - 98%)
             final randomConf = "${70 + Random().nextInt(29)}%";
             
             loadedMatches.add({
@@ -72,10 +72,10 @@ class _MainScreenState extends State<MainScreen> {
           _matches = loadedMatches;
         });
       } else {
-        _showErrorSnackBar("Szerver hiba történt. Kérlek próbáld újra!");
+        _showErrorSnackBar("Szerver hiba történt!");
       }
     } catch (e) {
-      _showErrorSnackBar("Nincs internetkapcsolat vagy az API nem elérhető.");
+      _showErrorSnackBar("Hálózati hiba lépett fel.");
     } finally {
       setState(() {
         _isLoading = false;
@@ -105,11 +105,7 @@ class _MainScreenState extends State<MainScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF151F32),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Text("🤖 AI Tippelemzés", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
-        ),
+        title: const Text("🤖 AI Tippelemzés", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
         content: Text("Meccs: $home - $away\n\n🔮 Ajánlott tipp: $randomPick\n🎯 Biztonság: $conf", style: const TextStyle(color: Colors.white70, fontSize: 15)),
         actions: [
           TextButton(
@@ -162,8 +158,7 @@ class _MainScreenState extends State<MainScreen> {
                   if (_matches.isEmpty && !_isLoading)
                     const Padding(
                       padding: EdgeInsets.only(top: 40.0),
-                      key: Key("empty_state"),
-                      child: Center(child: Text("Nyomj a fenti gombra az élő meccsekért!", style: TextStyle(color: Colors.white50))),
+                      child: Center(child: Text("Nyomj a fenti gombra az élő meccsekért!", style: TextStyle(color: Colors.white38))),
                     ),
                   ..._matches.map((m) => Card(
                         color: const Color(0xFF1E293B),
@@ -190,18 +185,7 @@ class _MainScreenState extends State<MainScreen> {
                         return Card(
                           color: const Color(0xFF1E293B),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          child: ListTile(
-                            title: Text(item['match']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                            subtitle: Text("🔮 Tipp: ${item['pick']}", style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(item['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
-                            ),
-                          ),
+                          child: Typography🔴(item), // Egyszerűsített listaelem megjelenítés
                         );
                       },
                     ),
@@ -216,6 +200,22 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.sports_soccer), label: "Elemző"),
           BottomNavigationBarItem(icon: Icon(Icons.list), label: "Tippek"),
         ],
+      ),
+    );
+  }
+
+  // Segédfüggvény a tiszta kódért
+  Widget Typography🔴(Map<String, String> item) {
+    return ListTile(
+      title: Text(item['match']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      subtitle: Text("🔮 Tipp: ${item['pick']}", style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF10B981).withOpacity(0.2),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(item['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
       ),
     );
   }
