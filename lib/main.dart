@@ -1,3 +1,4 @@
+        
 import 'package:flutter/material.dart';
 import 'dart:math';
 
@@ -9,10 +10,11 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext ThemeData) {
+  Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AI Tippelemző Pro',
-      theme: ThemeData.dark().copyWith(
+      theme: ThemeData(
+        brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0B0F19),
         cardColor: const Color(0xFF151F32),
       ),
@@ -81,8 +83,9 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF151F32),
-        title: const Text("🔮 AI TIPPELEMZŐ PRO", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text("🔮 AI TIPPELEMZŐ PRO", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
         centerTitle: true,
+        elevation: 0,
       ),
       body: _selectedIndex == 0
           ? Padding(
@@ -102,11 +105,12 @@ class _MainScreenState extends State<MainScreen> {
                   ..._matches.map((m) => Card(
                         color: const Color(0xFF1E293B),
                         margin: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: ListTile(
                           onTap: () => _analyzeMatch(m['home']!, m['away']!, m['conf']!),
-                          title: Text("${m['home']} VS ${m['away']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text("${m['league']} • ${m['time']}"),
-                          trailing: Text(m['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                          title: Text("${m['home']} VS ${m['away']}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                          subtitle: Text("${m['league']} • ${m['time']}", style: const TextStyle(color: Colors.white60)),
+                          trailing: Text(m['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
                       )),
                 ],
@@ -122,10 +126,18 @@ class _MainScreenState extends State<MainScreen> {
                         final item = _savedTips[index];
                         return Card(
                           color: const Color(0xFF1E293B),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           child: ListTile(
-                            title: Text(item['match']!),
-                            subtitle: Text("🔮 Tipp: ${item['pick']}", style: const TextStyle(color: Color(0xFF10B981))),
-                            trailing: Text(item['conf']!),
+                            title: Text(item['match']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            subtitle: Text("🔮 Tipp: ${item['pick']}", style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(item['conf']!, style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                            ),
                           ),
                         );
                       },
