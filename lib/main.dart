@@ -28,10 +28,8 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   List<Map<String, dynamic>> _allMatches = [];
-  List<Map<String, dynamic>> _filteredMatches = [];
   List<Map<String, dynamic>> _savedTips = [];
   bool _isLoading = false;
-  String _selectedDateFilter = "Összes";
 
   @override
   void initState() {
@@ -46,7 +44,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_pro_ultimate.json';
+    return '${dir.path}/tips_final_v14.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -79,35 +77,45 @@ class _MainScreenState extends State<MainScreen> {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
           for (var m in data) {
             String league = m['league']['name'].toString().toLowerCase();
-            if (league.contains("friendly")) continue;
+            if (league.contains("friendly")) continue; // Szigorú szűrés
+
             loaded.add({
               "home": m['teams']['home']['name'],
               "away": m['teams']['away']['name'],
               "league": m['league']['name'],
               "logo": m['league']['logo'],
-              "time": m['fixture']['status']['short'] == '1H' || m['fixture']['status']['short'] == '2H' ? "ÉLŐ" : DateTime.fromMillisecondsSinceEpoch(m['fixture']['timestamp'] * 1000).toString().substring(11, 16)
+              "status": m['fixture']['status']['short'],
+              "time": (m['fixture']['status']['short'] == '1H' || m['fixture']['status']['short'] == '2H') 
+                      ? "ÉLŐ" 
+                      : DateTime.fromMillisecondsSinceEpoch(m['fixture']['timestamp'] * 1000).toString().substring(11, 16)
             });
           }
         }
       } catch (_) {}
     }
-    setState(() { _allMatches = loaded; _filteredMatches = loaded; _isLoading = false; });
+    setState(() { _allMatches = loaded; _isLoading = false; });
   }
 
   void _analyze(Map<String, dynamic> m) {
-    double confidence = 70.0 + Random().nextDouble() * 25.0;
-    String tipText = "Eredmény: ${Random().nextInt(3)}-${Random().nextInt(3)} | Bizalom: ${confidence.toStringAsFixed(0)}%";
+    final rnd = Random();
+    double conf = 70.0 + rnd.nextDouble() * 25.0;
+    int hG = rnd.nextInt(3), aG = rnd.nextInt(3);
+    String tipText = "Várható: $hG-$aG, O/U: ${(hG+aG>2.5?'Over':'Under')}, Szöglet: ${8+rnd.nextInt(6)}";
     
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
       title: Text("${m['home']} vs ${m['away']}"),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
-        LinearProgressIndicator(value: confidence / 100, color: Colors.cyanAccent),
+        LinearProgressIndicator(value: conf / 100, color: Colors.cyanAccent),
         const SizedBox(height: 15),
-        Text(tipText),
+        _statRow("Várható eredmény", "$hG - $aG", Icons.score),
+        _statRow("Over/Under 2.5", (hG+aG>2.5) ? "Over" : "Under", Icons.trending_up),
+        _statRow("Szöglet tipp", "${8+rnd.nextInt(6)} db", Icons.circle_outlined),
+        _statRow("Szabálytalanság", "${18+rnd.nextInt(12)} db", Icons.sports),
       ]),
       actions: [
         IconButton(icon: const Icon(Icons.copy), onPressed: () => Clipboard.setData(ClipboardData(text: tipText))),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
         ElevatedButton(onPressed: () {
           setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": tipText, "status": "függőben"}));
           _saveTips(); Navigator.pop(context);
@@ -115,6 +123,11 @@ class _MainScreenState extends State<MainScreen> {
       ],
     ));
   }
+
+  Widget _statRow(String label, String value, IconData icon) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(children: [Icon(icon, size: 18, color: Colors.blueAccent), const SizedBox(width: 10), Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -124,11 +137,11 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO")),
       body: _selectedIndex == 0 
-        ? ListView.builder(itemCount: _filteredMatches.length, itemBuilder: (_, i) => Card(margin: const EdgeInsets.all(8), color: const Color(0xFF1E293B), child: ListTile(
-            leading: Image.network(_filteredMatches[i]['logo'] ?? "", width: 30, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)),
-            title: Text("${_filteredMatches[i]['home']} - ${_filteredMatches[i]['away']}"),
-            trailing: Text(_filteredMatches[i]['time'], style: TextStyle(color: _filteredMatches[i]['time'] == "ÉLŐ" ? Colors.red : Colors.greenAccent)),
-            onTap: () => _analyze(_filteredMatches[i]),
+        ? ListView.builder(itemCount: _allMatches.length, itemBuilder: (_, i) => Card(margin: const EdgeInsets.all(8), color: const Color(0xFF1E293B), child: ListTile(
+            leading: Image.network(_allMatches[i]['logo'] ?? "", width: 30, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)),
+            title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
+            trailing: Text(_allMatches[i]['time'], style: TextStyle(color: _allMatches[i]['time'] == "ÉLŐ" ? Colors.red : Colors.greenAccent)),
+            onTap: () => _analyze(_allMatches[i]),
           )))
         : Column(children: [
             Card(margin: const EdgeInsets.all(16), child: Padding(padding: const EdgeInsets.all(16), child: Text("Találati arány: ${rate.toStringAsFixed(1)}%"))),
