@@ -49,7 +49,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/ai_pro_final_v31.json';
+    return '${dir.path}/pro_analyzer_v32.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -112,9 +112,19 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _loadMatches() async {
     setState(() => _isLoading = true);
-    // API hívás helye...
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => _isLoading = false);
+    try {
+      // Itt az API hívásod maradjon, ez csak egy példa a felépítésre:
+      await Future.delayed(const Duration(seconds: 1)); // API szimuláció
+      setState(() {
+        _allMatches = [
+          {"home": "Flora Tallinn", "away": "Saburtalo", "status": "NS", "logo": "https://media.api-sports.io/football/leagues/1.png"},
+        ];
+      });
+    } catch (e) {
+      print("Hiba: $e");
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -126,11 +136,12 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("AI PRO ANALYZER"),
+        title: const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
         bottom: PreferredSize(preferredSize: const Size.fromHeight(60), child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
-            Expanded(child: TextField(decoration: const InputDecoration(hintText: "Keresés...", prefixIcon: Icon(Icons.search)), onChanged: (v) => setState(() => _searchQuery = v))),
+            Expanded(child: TextField(decoration: const InputDecoration(hintText: "Csapat keresése...", prefixIcon: Icon(Icons.search)), onChanged: (v) => setState(() => _searchQuery = v))),
             Switch(value: _isLiveOnly, onChanged: (v) => setState(() => _isLiveOnly = v)),
             const Text("Élő")
           ]),
@@ -141,16 +152,22 @@ class _MainScreenState extends State<MainScreen> {
         itemBuilder: (_, i) => _selectedIndex == 0 ? Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
-            title: Text("${filteredMatches[i]['home'] ?? 'N/A'} - ${filteredMatches[i]['away'] ?? 'N/A'}"),
+            leading: Image.network(filteredMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)),
+            title: Text("${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}"),
             onTap: () => _analyze(filteredMatches[i]),
           ),
-        ) : ListTile(
-          title: Text(_savedTips[i]['match']),
-          trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent), onPressed: () => setState(() => _savedTips.removeAt(i))),
+        ) : Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: ListTile(
+            title: Text(_savedTips[i]['match']),
+            subtitle: Text(_savedTips[i]['pick'], style: const TextStyle(color: Colors.amberAccent)),
+            trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.redAccent), onPressed: () => setState(() => _savedTips.removeAt(i))),
+          ),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
+        selectedItemColor: Colors.amberAccent,
         onTap: (i) => setState(() => _selectedIndex = i),
         items: const [BottomNavigationBarItem(icon: Icon(Icons.sports_soccer), label: "Meccsek"), BottomNavigationBarItem(icon: Icon(Icons.history), label: "Profit")],
       ),
