@@ -34,6 +34,9 @@ class _MainScreenState extends State<MainScreen> {
   List<Map<String, dynamic>> _allMatches = [];
   List<Map<String, dynamic>> _savedTips = [];
   bool _isLoading = false;
+  
+  // Szűrő változók
+  bool _hideFriendlies = true;
 
   @override
   void initState() {
@@ -48,7 +51,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_pro_v18_final.json';
+    return '${dir.path}/tips_pro_v19_filter.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -81,7 +84,9 @@ class _MainScreenState extends State<MainScreen> {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
           for (var m in data) {
             String league = m['league']['name'].toString().toLowerCase();
-            if (league.contains("friendly")) continue;
+            // Dinamikus szűrés
+            if (_hideFriendlies && (league.contains("friendly") || league.contains("friendlies"))) continue;
+            
             loaded.add({
               "home": m['teams']['home']['name'],
               "away": m['teams']['away']['name'],
@@ -96,22 +101,36 @@ class _MainScreenState extends State<MainScreen> {
     setState(() { _allMatches = loaded; _isLoading = false; });
   }
 
+  void _showFilterDialog() {
+    showDialog(context: context, builder: (_) => StatefulBuilder(builder: (context, setStateInDialog) => AlertDialog(
+      title: const Text("Szűrési beállítások"),
+      content: SwitchListTile(
+        title: const Text("Barátságos meccsek elrejtése"),
+        value: _hideFriendlies,
+        onChanged: (val) {
+          setStateInDialog(() => _hideFriendlies = val);
+          setState(() => _hideFriendlies = val);
+          _loadMatches();
+        },
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+    )));
+  }
+
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
-    // Intelligens AI Algoritmus: Súlyozott értékek a ligától függően
-    double factor = 0.8 + rnd.nextDouble() * 0.4;
     String cornerOU = (rnd.nextDouble() > 0.4) ? "Over 9.5" : "Under 9.5";
     String cardOU = (rnd.nextDouble() > 0.5) ? "Over 3.5" : "Under 3.5";
     String offsideOU = (rnd.nextDouble() > 0.6) ? "Over 2.5" : "Under 2.5";
     String foulOU = (rnd.nextDouble() > 0.45) ? "Over 24.5" : "Under 24.5";
-    int hG = (3 * factor).round(), aG = (2 * factor).round();
+    int hG = rnd.nextInt(3), aG = rnd.nextInt(3);
     
-    String tipText = "Várható: $hG-$aG | Szöglet: $cornerOU | Lap: $cardOU | Les: $offsideOU | Fault: $foulOU";
+    String tipText = "Eredmény: $hG-$aG | Szöglet: $cornerOU | Lap: $cardOU | Les: $offsideOU | Fault: $foulOU";
     
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-      title: Text("${m['home']} vs ${m['away']}", textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
+      title: Text("${m['home']} vs ${m['away']}", textAlign: TextAlign.center),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         _statRow("Várható eredmény", "$hG - $aG", Icons.analytics, Colors.amberAccent),
         _statRow("Szöglet (O/U)", cornerOU, Icons.radio_button_checked, Colors.greenAccent),
@@ -131,25 +150,25 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _statRow(String label, String value, IconData icon, Color color) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(children: [
-      Icon(icon, size: 22, color: color), const SizedBox(width: 15), Text(label, style: const TextStyle(fontSize: 15)),
-      const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white))
-    ]),
+    child: Row(children: [Icon(icon, size: 22, color: color), const SizedBox(width: 15), Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]),
   );
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)), backgroundColor: Colors.transparent, elevation: 0),
+      appBar: AppBar(
+        title: const Text("AI PRO ANALYZER"),
+        actions: [IconButton(icon: const Icon(Icons.filter_list), onPressed: _showFilterDialog)],
+      ),
       body: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
         itemCount: _selectedIndex == 0 ? _allMatches.length : _savedTips.length,
         itemBuilder: (_, i) => _selectedIndex == 0 
           ? Container(
               margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-              decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white10)),
+              decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(20)),
               child: ListTile(
                 leading: CircleAvatar(backgroundColor: Colors.white10, child: Image.network(_allMatches[i]['logo'] ?? "", width: 25, errorBuilder: (_,__,___) => const Icon(Icons.sports))),
-                title: Text(_allMatches[i]['home'] + " - " + _allMatches[i]['away'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
                 subtitle: Text(_allMatches[i]['league'], style: const TextStyle(color: Colors.amberAccent)),
                 trailing: Text(_allMatches[i]['time'], style: const TextStyle(fontWeight: FontWeight.bold)),
                 onTap: () => _analyze(_allMatches[i]),
