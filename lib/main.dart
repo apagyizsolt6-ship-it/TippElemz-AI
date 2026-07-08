@@ -13,7 +13,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(brightness: Brightness.dark, scaffoldBackgroundColor: const Color(0xFF0F172A)),
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        primaryColor: Colors.deepPurpleAccent,
+      ),
       home: const MainScreen(),
     );
   }
@@ -44,7 +48,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_final_v16.json';
+    return '${dir.path}/tips_final_v17_colorful.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -77,8 +81,8 @@ class _MainScreenState extends State<MainScreen> {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
           for (var m in data) {
             String league = m['league']['name'].toString().toLowerCase();
-            // Barátságos meccsek szűrése
-            if (league.contains("friendly")) continue;
+            // Szigorúbb szűrés: nem csak "friendly", hanem "club friendlies" és hasonlók is
+            if (league.contains("friendly") || league.contains("friendlies")) continue;
             
             loaded.add({
               "home": m['teams']['home']['name'],
@@ -98,40 +102,41 @@ class _MainScreenState extends State<MainScreen> {
     final rnd = Random();
     double conf = 70.0 + rnd.nextDouble() * 25.0;
     
-    // Generált statisztikák
     String cornerOU = (rnd.nextDouble() > 0.5) ? "Over 9.5" : "Under 9.5";
     String cardOU = (rnd.nextDouble() > 0.5) ? "Over 3.5" : "Under 3.5";
     String offsideOU = (rnd.nextDouble() > 0.5) ? "Over 2.5" : "Under 2.5";
     int hG = rnd.nextInt(3), aG = rnd.nextInt(3);
     
-    String tipText = "Eredmény: $hG-$aG, Szöglet: $cornerOU, Lapok: $cardOU, Les: $offsideOU";
+    String tipText = "Eredmény: $hG-$aG | Szöglet: $cornerOU | Lapok: $cardOU | Les: $offsideOU";
     
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text("${m['home']} vs ${m['away']}"),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+      title: Text("${m['home']} vs ${m['away']}", textAlign: TextAlign.center),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
-        LinearProgressIndicator(value: conf / 100, color: Colors.cyanAccent),
-        const SizedBox(height: 15),
-        _statRow("Várható eredmény", "$hG - $aG", Icons.score),
-        _statRow("Szöglet (O/U)", cornerOU, Icons.circle_outlined),
-        _statRow("Lapok (O/U)", cardOU, Icons.warning),
-        _statRow("Lesek (O/U)", offsideOU, Icons.flag),
+        LinearProgressIndicator(value: conf / 100, color: Colors.amberAccent, backgroundColor: Colors.white10),
+        const SizedBox(height: 20),
+        _statRow("Várható eredmény", "$hG - $aG", Icons.score, Colors.deepPurpleAccent),
+        _statRow("Szöglet (O/U)", cornerOU, Icons.circle_outlined, Colors.amber),
+        _statRow("Lapok (O/U)", cardOU, Icons.warning, Colors.redAccent),
+        _statRow("Lesek (O/U)", offsideOU, Icons.flag, Colors.tealAccent),
       ]),
       actions: [
-        IconButton(icon: const Icon(Icons.copy), onPressed: () => Clipboard.setData(ClipboardData(text: tipText))),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
-        ElevatedButton(onPressed: () {
+        IconButton(icon: const Icon(Icons.copy, color: Colors.white54), onPressed: () => Clipboard.setData(ClipboardData(text: tipText))),
+        ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurpleAccent), onPressed: () {
           setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": tipText, "status": "függőben"}));
           _saveTips(); Navigator.pop(context);
-        }, child: const Text("Mentés")),
+        }, child: const Text("Tipp mentése")),
       ],
     ));
   }
 
-  Widget _statRow(String label, String value, IconData icon) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(children: [Icon(icon, size: 18, color: Colors.blueAccent), const SizedBox(width: 10), Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]),
+  Widget _statRow(String label, String value, IconData icon, Color color) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(children: [
+      Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: color.withOpacity(0.2), borderRadius: BorderRadius.circular(8)), child: Icon(icon, size: 18, color: color)), 
+      const SizedBox(width: 12), Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white70))
+    ]),
   );
 
   @override
@@ -140,32 +145,29 @@ class _MainScreenState extends State<MainScreen> {
     double rate = _savedTips.isEmpty ? 0 : (won / _savedTips.length) * 100;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO"), centerTitle: true, backgroundColor: Colors.transparent, elevation: 0),
+      appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO"), backgroundColor: Colors.transparent, elevation: 0),
       body: _selectedIndex == 0 
         ? ListView.builder(itemCount: _allMatches.length, itemBuilder: (_, i) => Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)]), borderRadius: BorderRadius.circular(15)),
+            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF2D1B4E), Color(0xFF1E293B)]), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white12)),
             child: ListTile(
-              leading: Image.network(_allMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)),
-              title: Text(_allMatches[i]['league'], style: const TextStyle(fontSize: 12, color: Colors.blueAccent)),
-              subtitle: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
-              trailing: Text(_allMatches[i]['time'], style: TextStyle(color: _allMatches[i]['time'] == "ÉLŐ" ? Colors.red : Colors.greenAccent)),
+              leading: Image.network(_allMatches[i]['logo'] ?? "", width: 40, height: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer, color: Colors.amber)),
+              title: Text(_allMatches[i]['league'], style: const TextStyle(fontSize: 11, color: Colors.amberAccent, fontWeight: FontWeight.bold)),
+              subtitle: Text("${_allMatches[i]['home']} vs ${_allMatches[i]['away']}", style: const TextStyle(fontSize: 15, color: Colors.white)),
+              trailing: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: _allMatches[i]['time'] == "ÉLŐ" ? Colors.red : Colors.teal.withOpacity(0.2), borderRadius: BorderRadius.circular(10)), child: Text(_allMatches[i]['time'], style: const TextStyle(fontWeight: FontWeight.bold))),
               onTap: () => _analyze(_allMatches[i]),
             ),
           ))
         : Column(children: [
-            Container(margin: const EdgeInsets.all(20), padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(20)), child: Text("Találati arány: ${rate.toStringAsFixed(1)}%", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+            Container(margin: const EdgeInsets.all(20), padding: const EdgeInsets.all(20), decoration: BoxDecoration(gradient: const LinearGradient(colors: [Colors.deepPurple, Colors.indigo]), borderRadius: BorderRadius.circular(20)), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("Találati arány:", style: TextStyle(fontSize: 18)), Text("${rate.toStringAsFixed(1)}%", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold))])),
             Expanded(child: ListView.builder(itemCount: _savedTips.length, itemBuilder: (_, i) => ListTile(
-              title: Text(_savedTips[i]['match']),
-              subtitle: Text(_savedTips[i]['pick']),
-              trailing: IconButton(icon: Icon(Icons.check_circle, color: _savedTips[i]['status'] == 'NYERT' ? Colors.green : Colors.grey), onPressed: () => setState(() => _savedTips[i]['status'] = 'NYERT')),
+              leading: const Icon(Icons.history, color: Colors.amber),
+              title: Text(_savedTips[i]['match']), subtitle: Text(_savedTips[i]['pick']),
+              trailing: IconButton(icon: Icon(Icons.check_circle, color: _savedTips[i]['status'] == 'NYERT' ? Colors.tealAccent : Colors.white24), onPressed: () => setState(() => _savedTips[i]['status'] = 'NYERT')),
             )))
           ]),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF1E293B),
-        selectedItemColor: Colors.blueAccent,
-        currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
+        backgroundColor: const Color(0xFF0F172A), selectedItemColor: Colors.amberAccent, currentIndex: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i),
         items: const [BottomNavigationBarItem(icon: Icon(Icons.sports_soccer), label: "Meccsek"), BottomNavigationBarItem(icon: Icon(Icons.analytics), label: "Profit")],
       ),
     );
