@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart'; // Dátum formázáshoz
 
 void main() => runApp(const MyApp());
 
@@ -57,7 +58,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/pro_analyzer_v3_final.json';
+    return '${dir.path}/pro_analyzer_v4_final.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -139,6 +140,7 @@ class _MainScreenState extends State<MainScreen> {
           "logo": m['league']['logo'],
           "status": m['fixture']['status']['short'],
           "league": m['league']['name'],
+          "time": m['fixture']['date'] != null ? DateFormat('HH:mm').format(DateTime.parse(m['fixture']['date'])) : "--:--",
         })));
       }
     } catch (_) {}
@@ -155,7 +157,10 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          Text(DateFormat('yyyy.MM.dd').format(DateTime.now()), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ]),
         actions: [
           IconButton(icon: Icon(_hideFriendlies ? Icons.sports_esports : Icons.sports_soccer, color: _hideFriendlies ? Colors.grey : Colors.green), onPressed: () => setState(() => _hideFriendlies = !_hideFriendlies)),
           IconButton(icon: Icon(_isLiveOnly ? Icons.live_tv : Icons.tv_off, color: _isLiveOnly ? Colors.red : null), onPressed: () => setState(() => _isLiveOnly = !_isLiveOnly)),
@@ -177,7 +182,7 @@ class _MainScreenState extends State<MainScreen> {
           child: ListTile(
             leading: _selectedIndex == 0 ? Image.network(filteredMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)) : const Icon(Icons.history),
             title: Text(_selectedIndex == 0 ? "${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}" : _savedTips[i]['match']),
-            subtitle: _selectedIndex == 0 ? null : Text(_savedTips[i]['pick'], style: const TextStyle(color: Colors.amber)),
+            subtitle: _selectedIndex == 0 ? Text("Kezdés: ${filteredMatches[i]['time']}", style: TextStyle(color: Colors.amber[700])) : Text(_savedTips[i]['pick'], style: const TextStyle(color: Colors.amber)),
             onTap: () => _selectedIndex == 0 ? _analyze(filteredMatches[i]) : null,
             trailing: _selectedIndex == 1 ? IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => setState(() => _savedTips.removeAt(i))) : null,
           ),
