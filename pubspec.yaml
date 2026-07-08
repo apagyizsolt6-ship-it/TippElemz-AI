@@ -10,8 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Itt vannak a külső csomagok:
+  # Adatmentéshez
   path_provider: ^2.1.0
+  # Dátumok formázásához
+  intl: ^0.19.0
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
