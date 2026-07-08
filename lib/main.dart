@@ -55,7 +55,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_pro_full_v21.json';
+    return '${dir.path}/tips_pro_final_v23.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -90,13 +90,18 @@ class _MainScreenState extends State<MainScreen> {
             String league = m['league']['name'].toString().toLowerCase();
             if (_hideFriendlies && (league.contains("friendly") || league.contains("friendlies"))) continue;
             
+            DateTime matchTime = DateTime.fromMillisecondsSinceEpoch(m['fixture']['timestamp'] * 1000).toLocal();
+            String formattedTime = "${matchTime.hour.toString().padLeft(2, '0')}:${matchTime.minute.toString().padLeft(2, '0')}";
+            
             loaded.add({
               "home": m['teams']['home']['name'],
               "away": m['teams']['away']['name'],
               "league": m['league']['name'],
               "logo": m['league']['logo'],
               "date": dateStr,
-              "time": DateTime.fromMillisecondsSinceEpoch(m['fixture']['timestamp'] * 1000).toString().substring(11, 16)
+              "time": formattedTime,
+              "status": m['fixture']['status']['short'],
+              "score": "${m['goals']['home'] ?? 0} - ${m['goals']['away'] ?? 0}"
             });
           }
         }
@@ -123,20 +128,31 @@ class _MainScreenState extends State<MainScreen> {
 
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
-    String tipText = "Eredmény (OU): ${rnd.nextInt(3) + 1}.5 | Szöglet (OU): 9.5 | Lap (OU): 3.5 | Les (OU): 2.5 | Fault (OU): 24.5";
+    String result = "${rnd.nextInt(3)}-${rnd.nextInt(3)}";
     
     showDialog(context: context, builder: (_) => AlertDialog(
       title: Text("${m['home']} vs ${m['away']}"),
-      content: Text(tipText),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        _buildStatRow(Icons.analytics, "Várható eredmény", result),
+        _buildStatRow(Icons.radio_button_checked, "Szöglet (OU)", "Over 9.5"),
+        _buildStatRow(Icons.warning_amber, "Lapok (OU)", "Over 3.5"),
+        _buildStatRow(Icons.flag_outlined, "Lesek (OU)", "Over 2.5"),
+        _buildStatRow(Icons.sports_soccer, "Faultok (OU)", "Over 24.5"),
+      ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
         ElevatedButton(onPressed: () {
-          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": tipText}));
+          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "Eredmény: $result | Szöglet: O 9.5 | Lap: O 3.5 | Les: O 2.5 | Fault: O 24.5"}));
           _saveTips(); Navigator.pop(context);
         }, child: const Text("Mentés")),
       ],
     ));
   }
+
+  Widget _buildStatRow(IconData icon, String title, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(children: [Icon(icon, size: 20), const SizedBox(width: 10), Text(title), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +171,7 @@ class _MainScreenState extends State<MainScreen> {
               leading: Image.network(_allMatches[i]['logo'] ?? "", width: 30, errorBuilder: (_,__,___) => const Icon(Icons.sports)),
               title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
               subtitle: Text("${_allMatches[i]['league']} | ${_allMatches[i]['date']} ${_allMatches[i]['time']}"),
+              trailing: Text(_allMatches[i]['status'] == "1H" || _allMatches[i]['status'] == "2H" ? _allMatches[i]['score'] : ""),
               onTap: () => _analyze(_allMatches[i]),
             )
           : ListTile(title: Text(_savedTips[i]['match']), subtitle: Text(_savedTips[i]['pick'])),
