@@ -1,6 +1,6 @@
-name: ai_tippelemzo_pro
-description: "A professional AI football prediction application."
-publish_to: 'none'
+name: ai_pro_analyzer
+description: "Egy professzionális AI alapú sportelemző alkalmazás."
+publish_to: 'none' 
 
 version: 1.0.0+1
 
@@ -10,8 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
-  path_provider: ^2.1.3
+  # Itt vannak a külső csomagok:
+  path_provider: ^2.1.0
+  cupertino_icons: ^1.0.6
 
 dev_dependencies:
   flutter_test:
