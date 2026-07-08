@@ -44,7 +44,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_pro_v15_modern.json';
+    return '${dir.path}/tips_final_v16.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -77,7 +77,9 @@ class _MainScreenState extends State<MainScreen> {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
           for (var m in data) {
             String league = m['league']['name'].toString().toLowerCase();
+            // Barátságos meccsek szűrése
             if (league.contains("friendly")) continue;
+            
             loaded.add({
               "home": m['teams']['home']['name'],
               "away": m['teams']['away']['name'],
@@ -95,8 +97,14 @@ class _MainScreenState extends State<MainScreen> {
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
     double conf = 70.0 + rnd.nextDouble() * 25.0;
+    
+    // Generált statisztikák
+    String cornerOU = (rnd.nextDouble() > 0.5) ? "Over 9.5" : "Under 9.5";
+    String cardOU = (rnd.nextDouble() > 0.5) ? "Over 3.5" : "Under 3.5";
+    String offsideOU = (rnd.nextDouble() > 0.5) ? "Over 2.5" : "Under 2.5";
     int hG = rnd.nextInt(3), aG = rnd.nextInt(3);
-    String tipText = "Várható: $hG-$aG, O/U: ${(hG+aG>2.5?'Over':'Under')}, Szöglet: ${8+rnd.nextInt(6)}";
+    
+    String tipText = "Eredmény: $hG-$aG, Szöglet: $cornerOU, Lapok: $cardOU, Les: $offsideOU";
     
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
@@ -106,9 +114,9 @@ class _MainScreenState extends State<MainScreen> {
         LinearProgressIndicator(value: conf / 100, color: Colors.cyanAccent),
         const SizedBox(height: 15),
         _statRow("Várható eredmény", "$hG - $aG", Icons.score),
-        _statRow("Over/Under 2.5", (hG+aG>2.5) ? "Over" : "Under", Icons.trending_up),
-        _statRow("Szöglet tipp", "${8+rnd.nextInt(6)} db", Icons.circle_outlined),
-        _statRow("Szabálytalanság", "${18+rnd.nextInt(12)} db", Icons.sports),
+        _statRow("Szöglet (O/U)", cornerOU, Icons.circle_outlined),
+        _statRow("Lapok (O/U)", cardOU, Icons.warning),
+        _statRow("Lesek (O/U)", offsideOU, Icons.flag),
       ]),
       actions: [
         IconButton(icon: const Icon(Icons.copy), onPressed: () => Clipboard.setData(ClipboardData(text: tipText))),
@@ -132,22 +140,21 @@ class _MainScreenState extends State<MainScreen> {
     double rate = _savedTips.isEmpty ? 0 : (won / _savedTips.length) * 100;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)), centerTitle: true, elevation: 0, backgroundColor: Colors.transparent),
+      appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO"), centerTitle: true, backgroundColor: Colors.transparent, elevation: 0),
       body: _selectedIndex == 0 
         ? ListView.builder(itemCount: _allMatches.length, itemBuilder: (_, i) => Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)]), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
+            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)]), borderRadius: BorderRadius.circular(15)),
             child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-              leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(_allMatches[i]['logo'] ?? "", width: 40, height: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer))),
+              leading: Image.network(_allMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)),
               title: Text(_allMatches[i]['league'], style: const TextStyle(fontSize: 12, color: Colors.blueAccent)),
-              subtitle: Text("${_allMatches[i]['home']} vs ${_allMatches[i]['away']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              trailing: Text(_allMatches[i]['time'], style: TextStyle(fontWeight: FontWeight.bold, color: _allMatches[i]['time'] == "ÉLŐ" ? Colors.red : Colors.greenAccent)),
+              subtitle: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
+              trailing: Text(_allMatches[i]['time'], style: TextStyle(color: _allMatches[i]['time'] == "ÉLŐ" ? Colors.red : Colors.greenAccent)),
               onTap: () => _analyze(_allMatches[i]),
             ),
           ))
         : Column(children: [
-            Container(margin: const EdgeInsets.all(20), padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(20)), child: Text("Teljes találati arány: ${rate.toStringAsFixed(1)}%", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+            Container(margin: const EdgeInsets.all(20), padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(20)), child: Text("Találati arány: ${rate.toStringAsFixed(1)}%", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
             Expanded(child: ListView.builder(itemCount: _savedTips.length, itemBuilder: (_, i) => ListTile(
               title: Text(_savedTips[i]['match']),
               subtitle: Text(_savedTips[i]['pick']),
