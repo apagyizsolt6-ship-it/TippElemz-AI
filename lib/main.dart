@@ -3,28 +3,34 @@ import 'dart:math';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter/services.dart';
 
 void main() => runApp(const MyApp());
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = ThemeMode.dark;
+  void toggleTheme() => setState(() => _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
-        colorScheme: const ColorScheme.dark(primary: Colors.amberAccent),
-      ),
-      home: const MainScreen(),
+      theme: ThemeData.light(),
+      darkTheme: ThemeData.dark(),
+      themeMode: _themeMode,
+      home: MainScreen(toggleTheme: toggleTheme),
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final VoidCallback toggleTheme;
+  const MainScreen({super.key, required this.toggleTheme});
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
@@ -49,7 +55,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_pro_full.json';
+    return '${dir.path}/tips_pro_full_v21.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -89,6 +95,7 @@ class _MainScreenState extends State<MainScreen> {
               "away": m['teams']['away']['name'],
               "league": m['league']['name'],
               "logo": m['league']['logo'],
+              "date": dateStr,
               "time": DateTime.fromMillisecondsSinceEpoch(m['fixture']['timestamp'] * 1000).toString().substring(11, 16)
             });
           }
@@ -116,15 +123,11 @@ class _MainScreenState extends State<MainScreen> {
 
   void _analyze(Map<String, dynamic> m) {
     final rnd = Random();
-    String tipText = "Eredmény: ${rnd.nextInt(3)}-${rnd.nextInt(3)} | Szöglet: O/U 9.5 | Lap: ${rnd.nextInt(5)} db | Fault: ${20 + rnd.nextInt(10)} db";
+    String tipText = "Eredmény (OU): ${rnd.nextInt(3) + 1}.5 | Szöglet (OU): 9.5 | Lap (OU): 3.5 | Les (OU): 2.5 | Fault (OU): 24.5";
     
     showDialog(context: context, builder: (_) => AlertDialog(
-      backgroundColor: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text("${m['home']} vs ${m['away']}", textAlign: TextAlign.center),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(tipText, textAlign: TextAlign.center),
-      ]),
+      title: Text("${m['home']} vs ${m['away']}"),
+      content: Text(tipText),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
         ElevatedButton(onPressed: () {
@@ -140,7 +143,10 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("AI PRO ANALYZER"),
-        actions: [IconButton(icon: const Icon(Icons.filter_list), onPressed: _showFilterDialog)],
+        actions: [
+          IconButton(icon: const Icon(Icons.brightness_4), onPressed: widget.toggleTheme),
+          IconButton(icon: const Icon(Icons.filter_list), onPressed: _showFilterDialog)
+        ],
       ),
       body: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
         itemCount: _selectedIndex == 0 ? _allMatches.length : _savedTips.length,
@@ -148,8 +154,7 @@ class _MainScreenState extends State<MainScreen> {
           ? ListTile(
               leading: Image.network(_allMatches[i]['logo'] ?? "", width: 30, errorBuilder: (_,__,___) => const Icon(Icons.sports)),
               title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
-              subtitle: Text(_allMatches[i]['league']),
-              trailing: Text(_allMatches[i]['time']),
+              subtitle: Text("${_allMatches[i]['league']} | ${_allMatches[i]['date']} ${_allMatches[i]['time']}"),
               onTap: () => _analyze(_allMatches[i]),
             )
           : ListTile(title: Text(_savedTips[i]['match']), subtitle: Text(_savedTips[i]['pick'])),
