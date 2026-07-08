@@ -40,6 +40,8 @@ class _MainScreenState extends State<MainScreen> {
   List<Map<String, dynamic>> _allMatches = [];
   List<Map<String, dynamic>> _savedTips = [];
   bool _isLoading = false;
+  bool _isLiveOnly = false;
+  bool _hideFriendlies = true;
   String _searchQuery = "";
 
   @override
@@ -55,7 +57,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/pro_analyzer_turbo.json';
+    return '${dir.path}/pro_analyzer_v3_final.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -87,10 +89,11 @@ class _MainScreenState extends State<MainScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text("${m['home']} vs ${m['away']}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber)),
             const SizedBox(height: 15),
-            _buildStatRow(Icons.sports_soccer, "Várható kimenetel", "Hazai Győzelem (1)", "78% Conf", Colors.blue),
+            _buildStatRow(Icons.sports_soccer, "Várható kimenetel", "Hazai Győzelem", "78% Conf", Colors.blue),
             _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", "Over 9.5", "85% Conf", Colors.green, isBest: true),
             _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", "Over 24.5", "68% Conf", Colors.orange),
-            _buildStatRow(Icons.track_changes, "Kapuralövés (O/U)", "Over 8.5", "72% Conf", Colors.red),
+            _buildStatRow(Icons.receipt_long, "Lapok (O/U)", "Over 3.5", "65% Conf", Colors.yellow),
+            _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", "Over 2.5", "60% Conf", Colors.purple),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
@@ -134,6 +137,8 @@ class _MainScreenState extends State<MainScreen> {
           "home": m['teams']['home']['name'],
           "away": m['teams']['away']['name'],
           "logo": m['league']['logo'],
+          "status": m['fixture']['status']['short'],
+          "league": m['league']['name'],
         })));
       }
     } catch (_) {}
@@ -142,28 +147,38 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredMatches = _allMatches.where((m) => 
+      (m['home']?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? true) &&
+      (!_isLiveOnly || m['status'] == '1H' || m['status'] == '2H' || m['status'] == 'ET' || m['status'] == 'LIVE') &&
+      (!_hideFriendlies || !(m['league']?.toString().toLowerCase().contains('friendly') ?? false))
+    ).toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.bold)),
-        actions: [IconButton(icon: const Icon(Icons.brightness_6), onPressed: widget.toggleTheme)],
+        actions: [
+          IconButton(icon: Icon(_hideFriendlies ? Icons.sports_esports : Icons.sports_soccer, color: _hideFriendlies ? Colors.grey : Colors.green), onPressed: () => setState(() => _hideFriendlies = !_hideFriendlies)),
+          IconButton(icon: Icon(_isLiveOnly ? Icons.live_tv : Icons.tv_off, color: _isLiveOnly ? Colors.red : null), onPressed: () => setState(() => _isLiveOnly = !_isLiveOnly)),
+          IconButton(icon: const Icon(Icons.brightness_6), onPressed: widget.toggleTheme),
+        ],
         bottom: PreferredSize(preferredSize: const Size.fromHeight(60), child: Padding(
           padding: const EdgeInsets.all(16),
           child: TextField(decoration: const InputDecoration(hintText: "Csapat keresése...", prefixIcon: Icon(Icons.search)), onChanged: (v) => setState(() => _searchQuery = v)),
         )),
       ),
       body: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
-        itemCount: _selectedIndex == 0 ? _allMatches.length : _savedTips.length,
+        itemCount: _selectedIndex == 0 ? filteredMatches.length : _savedTips.length,
         itemBuilder: (_, i) => Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [Colors.blueGrey.withOpacity(0.3), Colors.transparent]),
+            gradient: LinearGradient(colors: [Theme.of(context).cardColor, Colors.transparent]),
             borderRadius: BorderRadius.circular(15),
           ),
           child: ListTile(
-            leading: _selectedIndex == 0 ? Image.network(_allMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)) : const Icon(Icons.history),
-            title: Text(_selectedIndex == 0 ? "${_allMatches[i]['home']} - ${_allMatches[i]['away']}" : _savedTips[i]['match']),
+            leading: _selectedIndex == 0 ? Image.network(filteredMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)) : const Icon(Icons.history),
+            title: Text(_selectedIndex == 0 ? "${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}" : _savedTips[i]['match']),
             subtitle: _selectedIndex == 0 ? null : Text(_savedTips[i]['pick'], style: const TextStyle(color: Colors.amber)),
-            onTap: () => _selectedIndex == 0 ? _analyze(_allMatches[i]) : null,
+            onTap: () => _selectedIndex == 0 ? _analyze(filteredMatches[i]) : null,
             trailing: _selectedIndex == 1 ? IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => setState(() => _savedTips.removeAt(i))) : null,
           ),
         ),
