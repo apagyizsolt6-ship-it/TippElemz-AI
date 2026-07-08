@@ -44,7 +44,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_final_v14.json';
+    return '${dir.path}/tips_pro_v15_modern.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -77,17 +77,13 @@ class _MainScreenState extends State<MainScreen> {
           var data = json.decode(await res.transform(utf8.decoder).join())['response'];
           for (var m in data) {
             String league = m['league']['name'].toString().toLowerCase();
-            if (league.contains("friendly")) continue; // Szigorú szűrés
-
+            if (league.contains("friendly")) continue;
             loaded.add({
               "home": m['teams']['home']['name'],
               "away": m['teams']['away']['name'],
               "league": m['league']['name'],
               "logo": m['league']['logo'],
-              "status": m['fixture']['status']['short'],
-              "time": (m['fixture']['status']['short'] == '1H' || m['fixture']['status']['short'] == '2H') 
-                      ? "ÉLŐ" 
-                      : DateTime.fromMillisecondsSinceEpoch(m['fixture']['timestamp'] * 1000).toString().substring(11, 16)
+              "time": (m['fixture']['status']['short'] == '1H' || m['fixture']['status']['short'] == '2H') ? "ÉLŐ" : DateTime.fromMillisecondsSinceEpoch(m['fixture']['timestamp'] * 1000).toString().substring(11, 16)
             });
           }
         }
@@ -104,6 +100,7 @@ class _MainScreenState extends State<MainScreen> {
     
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text("${m['home']} vs ${m['away']}"),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         LinearProgressIndicator(value: conf / 100, color: Colors.cyanAccent),
@@ -135,16 +132,22 @@ class _MainScreenState extends State<MainScreen> {
     double rate = _savedTips.isEmpty ? 0 : (won / _savedTips.length) * 100;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO")),
+      appBar: AppBar(title: const Text("AI TIPPELEMZŐ PRO", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)), centerTitle: true, elevation: 0, backgroundColor: Colors.transparent),
       body: _selectedIndex == 0 
-        ? ListView.builder(itemCount: _allMatches.length, itemBuilder: (_, i) => Card(margin: const EdgeInsets.all(8), color: const Color(0xFF1E293B), child: ListTile(
-            leading: Image.network(_allMatches[i]['logo'] ?? "", width: 30, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)),
-            title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
-            trailing: Text(_allMatches[i]['time'], style: TextStyle(color: _allMatches[i]['time'] == "ÉLŐ" ? Colors.red : Colors.greenAccent)),
-            onTap: () => _analyze(_allMatches[i]),
-          )))
+        ? ListView.builder(itemCount: _allMatches.length, itemBuilder: (_, i) => Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF1E293B), Color(0xFF0F172A)]), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+              leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(_allMatches[i]['logo'] ?? "", width: 40, height: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer))),
+              title: Text(_allMatches[i]['league'], style: const TextStyle(fontSize: 12, color: Colors.blueAccent)),
+              subtitle: Text("${_allMatches[i]['home']} vs ${_allMatches[i]['away']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              trailing: Text(_allMatches[i]['time'], style: TextStyle(fontWeight: FontWeight.bold, color: _allMatches[i]['time'] == "ÉLŐ" ? Colors.red : Colors.greenAccent)),
+              onTap: () => _analyze(_allMatches[i]),
+            ),
+          ))
         : Column(children: [
-            Card(margin: const EdgeInsets.all(16), child: Padding(padding: const EdgeInsets.all(16), child: Text("Találati arány: ${rate.toStringAsFixed(1)}%"))),
+            Container(margin: const EdgeInsets.all(20), padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(20)), child: Text("Teljes találati arány: ${rate.toStringAsFixed(1)}%", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
             Expanded(child: ListView.builder(itemCount: _savedTips.length, itemBuilder: (_, i) => ListTile(
               title: Text(_savedTips[i]['match']),
               subtitle: Text(_savedTips[i]['pick']),
@@ -152,6 +155,8 @@ class _MainScreenState extends State<MainScreen> {
             )))
           ]),
       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: const Color(0xFF1E293B),
+        selectedItemColor: Colors.blueAccent,
         currentIndex: _selectedIndex,
         onTap: (i) => setState(() => _selectedIndex = i),
         items: const [BottomNavigationBarItem(icon: Icon(Icons.sports_soccer), label: "Meccsek"), BottomNavigationBarItem(icon: Icon(Icons.analytics), label: "Profit")],
