@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui'; // A Blur hatáshoz szükséges
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 
@@ -13,11 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
-        colorScheme: const ColorScheme.dark(primary: Colors.amberAccent),
-      ),
+      theme: ThemeData(brightness: Brightness.dark, scaffoldBackgroundColor: const Color(0xFF0F172A)),
       home: const MainScreen(),
     );
   }
@@ -33,151 +30,91 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   List<Map<String, dynamic>> _allMatches = [];
   List<Map<String, dynamic>> _savedTips = [];
-  bool _isLoading = false;
-  
-  // Szűrő változók
   bool _hideFriendlies = true;
 
   @override
   void initState() {
     super.initState();
-    _loadAllData();
+    _loadData();
   }
 
-  Future<void> _loadAllData() async {
-    await _loadSavedTips();
-    await _loadMatches();
-  }
-
-  Future<String> _getPath() async {
+  Future<void> _loadData() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_pro_v19_filter.json';
-  }
-
-  Future<void> _loadSavedTips() async {
-    final file = File(await _getPath());
+    final file = File('${dir.path}/tips_pro_v20_cyber.json');
     if (await file.exists()) {
-      try {
-        final content = await file.readAsString();
-        setState(() => _savedTips = List<Map<String, dynamic>>.from(json.decode(content)));
-      } catch (_) {}
+      setState(() => _savedTips = List<Map<String, dynamic>>.from(json.decode(file.readAsStringSync())));
     }
+    await _fetchMatches();
   }
 
-  Future<void> _saveTips() async {
-    final file = File(await _getPath());
-    await file.writeAsString(json.encode(_savedTips));
-  }
-
-  Future<void> _loadMatches() async {
-    setState(() => _isLoading = true);
+  Future<void> _fetchMatches() async {
     List<Map<String, dynamic>> loaded = [];
-    final client = HttpClient();
-    
-    for (int i = 0; i < 4; i++) {
-      String dateStr = DateTime.now().add(Duration(days: i)).toString().substring(0, 10);
-      try {
-        var req = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?date=$dateStr'));
-        req.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f');
-        var res = await req.close();
-        if (res.statusCode == 200) {
-          var data = json.decode(await res.transform(utf8.decoder).join())['response'];
-          for (var m in data) {
-            String league = m['league']['name'].toString().toLowerCase();
-            // Dinamikus szűrés
-            if (_hideFriendlies && (league.contains("friendly") || league.contains("friendlies"))) continue;
-            
-            loaded.add({
-              "home": m['teams']['home']['name'],
-              "away": m['teams']['away']['name'],
-              "league": m['league']['name'],
-              "logo": m['league']['logo'],
-              "time": (m['fixture']['status']['short'] == '1H' || m['fixture']['status']['short'] == '2H') ? "LIVE" : DateTime.fromMillisecondsSinceEpoch(m['fixture']['timestamp'] * 1000).toString().substring(11, 16)
-            });
-          }
+    try {
+      var req = await HttpClient().getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?date=${DateTime.now().toString().substring(0, 10)}'));
+      req.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f');
+      var res = await req.close();
+      if (res.statusCode == 200) {
+        var data = json.decode(await res.transform(utf8.decoder).join())['response'];
+        for (var m in data) {
+          String league = m['league']['name'].toString().toLowerCase();
+          if (_hideFriendlies && (league.contains("friendly") || league.contains("friendlies"))) continue;
+          loaded.add({
+            "home": m['teams']['home']['name'],
+            "away": m['teams']['away']['name'],
+            "league": m['league']['name'],
+            "logo": m['league']['logo'],
+            "conf": 60 + Random().nextInt(40) // Bizalmi index
+          });
         }
-      } catch (_) {}
-    }
-    setState(() { _allMatches = loaded; _isLoading = false; });
-  }
-
-  void _showFilterDialog() {
-    showDialog(context: context, builder: (_) => StatefulBuilder(builder: (context, setStateInDialog) => AlertDialog(
-      title: const Text("Szűrési beállítások"),
-      content: SwitchListTile(
-        title: const Text("Barátságos meccsek elrejtése"),
-        value: _hideFriendlies,
-        onChanged: (val) {
-          setStateInDialog(() => _hideFriendlies = val);
-          setState(() => _hideFriendlies = val);
-          _loadMatches();
-        },
-      ),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
-    )));
+      }
+    } catch (_) {}
+    setState(() => _allMatches = loaded);
   }
 
   void _analyze(Map<String, dynamic> m) {
-    final rnd = Random();
-    String cornerOU = (rnd.nextDouble() > 0.4) ? "Over 9.5" : "Under 9.5";
-    String cardOU = (rnd.nextDouble() > 0.5) ? "Over 3.5" : "Under 3.5";
-    String offsideOU = (rnd.nextDouble() > 0.6) ? "Over 2.5" : "Under 2.5";
-    String foulOU = (rnd.nextDouble() > 0.45) ? "Over 24.5" : "Under 24.5";
-    int hG = rnd.nextInt(3), aG = rnd.nextInt(3);
-    
-    String tipText = "Eredmény: $hG-$aG | Szöglet: $cornerOU | Lap: $cardOU | Les: $offsideOU | Fault: $foulOU";
-    
-    showDialog(context: context, builder: (_) => AlertDialog(
-      backgroundColor: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-      title: Text("${m['home']} vs ${m['away']}", textAlign: TextAlign.center),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        _statRow("Várható eredmény", "$hG - $aG", Icons.analytics, Colors.amberAccent),
-        _statRow("Szöglet (O/U)", cornerOU, Icons.radio_button_checked, Colors.greenAccent),
-        _statRow("Lapok (O/U)", cardOU, Icons.warning_amber_rounded, Colors.orangeAccent),
-        _statRow("Lesek (O/U)", offsideOU, Icons.flag_outlined, Colors.purpleAccent),
-        _statRow("Faultok (O/U)", foulOU, Icons.sports_soccer, Colors.redAccent),
-      ]),
-      actions: [
-        IconButton(icon: const Icon(Icons.copy), onPressed: () => Clipboard.setData(ClipboardData(text: tipText))),
-        ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black), onPressed: () {
-          setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": tipText, "status": "függőben"}));
-          _saveTips(); Navigator.pop(context);
-        }, child: const Text("Tipp mentése")),
-      ],
+    showDialog(context: context, builder: (_) => BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+      child: AlertDialog(
+        backgroundColor: const Color(0xFF1E293B).withOpacity(0.8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30), side: BorderSide(color: m['conf'] > 80 ? Colors.greenAccent : Colors.blueAccent, width: 2)),
+        title: Text("${m['home']} vs ${m['away']}", textAlign: TextAlign.center),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text("Bizalom Index: ${m['conf']}%", style: TextStyle(color: m['conf'] > 80 ? Colors.greenAccent : Colors.amber)),
+          const SizedBox(height: 10),
+          _statRow("Eredmény", "2-1"),
+          _statRow("Szöglet", "Over 9.5"),
+          _statRow("Lapok", "Under 3.5"),
+        ]),
+      ),
     ));
   }
 
-  Widget _statRow(String label, String value, IconData icon, Color color) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(children: [Icon(icon, size: 22, color: color), const SizedBox(width: 15), Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]),
-  );
+  Widget _statRow(String label, String value) => Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [Text(label), const Spacer(), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))]));
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("AI PRO ANALYZER"),
-        actions: [IconButton(icon: const Icon(Icons.filter_list), onPressed: _showFilterDialog)],
-      ),
-      body: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
-        itemCount: _selectedIndex == 0 ? _allMatches.length : _savedTips.length,
-        itemBuilder: (_, i) => _selectedIndex == 0 
-          ? Container(
-              margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-              decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(20)),
-              child: ListTile(
-                leading: CircleAvatar(backgroundColor: Colors.white10, child: Image.network(_allMatches[i]['logo'] ?? "", width: 25, errorBuilder: (_,__,___) => const Icon(Icons.sports))),
-                title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
-                subtitle: Text(_allMatches[i]['league'], style: const TextStyle(color: Colors.amberAccent)),
-                trailing: Text(_allMatches[i]['time'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                onTap: () => _analyze(_allMatches[i]),
-              ),
-            )
-          : ListTile(title: Text(_savedTips[i]['match']), subtitle: Text(_savedTips[i]['pick'])),
+      appBar: AppBar(title: const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.transparent, elevation: 0),
+      body: Column(
+        children: [
+          // Top Tippek Szekció
+          SizedBox(height: 120, child: ListView.builder(scrollDirection: Axis.horizontal, itemCount: _allMatches.length, itemBuilder: (_, i) => Container(
+            width: 120, margin: const EdgeInsets.all(10), decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: _allMatches[i]['conf'] > 80 ? Colors.greenAccent : Colors.transparent), color: Colors.white10),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_allMatches[i]['home'], style: const TextStyle(fontSize: 10)), Text("${_allMatches[i]['conf']}%", style: const TextStyle(color: Colors.amberAccent))]),
+          ))),
+          Expanded(child: ListView.builder(itemCount: _allMatches.length, itemBuilder: (_, i) => Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(20), border: Border.all(color: _allMatches[i]['conf'] > 80 ? Colors.greenAccent : Colors.white12)),
+            child: ListTile(
+              title: Text(_allMatches[i]['home'] + " - " + _allMatches[i]['away']),
+              subtitle: Text(_allMatches[i]['league'], style: const TextStyle(fontSize: 10)),
+              onTap: () => _analyze(_allMatches[i]),
+            ),
+          ))),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF0F172A), selectedItemColor: Colors.amberAccent, currentIndex: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i),
+        backgroundColor: const Color(0xFF0F172A), currentIndex: _selectedIndex, onTap: (i) => setState(() => _selectedIndex = i),
         items: const [BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: "Meccsek"), BottomNavigationBarItem(icon: Icon(Icons.history), label: "Profit")],
       ),
     );
