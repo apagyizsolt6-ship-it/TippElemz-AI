@@ -49,7 +49,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/tips_pro_stable.json';
+    return '${dir.path}/tips_pro_full.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -72,7 +72,6 @@ class _MainScreenState extends State<MainScreen> {
     List<Map<String, dynamic>> loaded = [];
     final client = HttpClient();
     
-    // Alapértelmezett meccs adatok lekérése
     for (int i = 0; i < 3; i++) {
       String dateStr = DateTime.now().add(Duration(days: i)).toString().substring(0, 10);
       try {
@@ -89,6 +88,7 @@ class _MainScreenState extends State<MainScreen> {
               "home": m['teams']['home']['name'],
               "away": m['teams']['away']['name'],
               "league": m['league']['name'],
+              "logo": m['league']['logo'],
               "time": DateTime.fromMillisecondsSinceEpoch(m['fixture']['timestamp'] * 1000).toString().substring(11, 16)
             });
           }
@@ -120,8 +120,11 @@ class _MainScreenState extends State<MainScreen> {
     
     showDialog(context: context, builder: (_) => AlertDialog(
       backgroundColor: const Color(0xFF1E293B),
-      title: Text("${m['home']} vs ${m['away']}"),
-      content: Text(tipText),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text("${m['home']} vs ${m['away']}", textAlign: TextAlign.center),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(tipText, textAlign: TextAlign.center),
+      ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Bezár")),
         ElevatedButton(onPressed: () {
@@ -143,6 +146,7 @@ class _MainScreenState extends State<MainScreen> {
         itemCount: _selectedIndex == 0 ? _allMatches.length : _savedTips.length,
         itemBuilder: (_, i) => _selectedIndex == 0 
           ? ListTile(
+              leading: Image.network(_allMatches[i]['logo'] ?? "", width: 30, errorBuilder: (_,__,___) => const Icon(Icons.sports)),
               title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
               subtitle: Text(_allMatches[i]['league']),
               trailing: Text(_allMatches[i]['time']),
