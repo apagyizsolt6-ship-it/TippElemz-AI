@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui';
+import 'dart:ui' as ui; // JAVÍTÁS: szétválasztottuk az ui névteret, hogy ne legyen ütközés
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 
@@ -98,7 +98,6 @@ class _MainScreenState extends State<MainScreen> {
     await file.writeAsString(json.encode(_savedTips));
   }
 
-  // --- 🧠 JAVÍTOTT, BOMBABIZTOS POISSON ENGINE ---
   Map<String, dynamic> _calculateRealAiPredictions({
     required Map<String, dynamic> homeStats,
     required Map<String, dynamic> awayStats,
@@ -109,7 +108,6 @@ class _MainScreenState extends State<MainScreen> {
     int nameSeed = homeName.hashCode ^ awayName.hashCode;
     bool hasRealApiData = homeStats.isNotEmpty && awayStats.isNotEmpty;
 
-    // Itt vettem ki a duplázott deklarációkat (double homeAtt és awayAtt)
     double homeAtt = 1.3;
     double homeDef = 1.2;
     double awayAtt = 1.1;
@@ -174,7 +172,7 @@ class _MainScreenState extends State<MainScreen> {
       "fouls": "Over $foulsLine", "foulsConf": "$foulsConf% Conf", "isFoulsBest": false,
       "cards": "Over $cardsLine", "cardsConf": "$cardsConf% Conf", "isCardsBest": false,
       "offsides": "Over 2.5", "offsidesConf": "65% Conf", "isOffsidesBest": false,
-      "marketOdds": realOdds // JAVÍTÁS: Szöveges "N/A" helyett tisztán double számot ad vissza
+      "marketOdds": realOdds
     };
   }
 
@@ -188,7 +186,7 @@ class _MainScreenState extends State<MainScreen> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), // JAVÍTÁS: ui.ImageFilter-t használunk a hiba ellen
                 child: const Center(child: CircularProgressIndicator(color: Colors.amber)),
               );
             }
@@ -199,13 +197,13 @@ class _MainScreenState extends State<MainScreen> {
               "fouls": "N/A", "foulsConf": "0%", "isFoulsBest": false,
               "cards": "N/A", "cardsConf": "0%", "isCardsBest": false,
               "offsides": "N/A", "offsidesConf": "0%", "isOffsidesBest": false,
-              "marketOdds": 0.0 // JAVÍTÁS: Itt is double a fallback
+              "marketOdds": 0.0
             };
 
             double currentOdds = double.tryParse(ai['marketOdds'].toString()) ?? 0.0;
 
             return BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), // JAVÍTÁS: ui.ImageFilter-t használunk itt is
               child: Dialog(
                 backgroundColor: Colors.transparent,
                 child: Container(
