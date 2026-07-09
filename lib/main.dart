@@ -106,7 +106,6 @@ class _MainScreenState extends State<MainScreen> {
     required String homeName,
     required String awayName,
   }) {
-    // Valódi gólátlagok kinyerése az API válaszból
     double homeAtt = double.tryParse(homeStats['goals']?['for']?['average']?['home']?.toString() ?? '1.5') ?? 1.5;
     double awayDef = double.tryParse(awayStats['goals']?['against']?['average']?['away']?.toString() ?? '1.2') ?? 1.2;
     double awayAtt = double.tryParse(awayStats['goals']?['for']?['average']?['away']?.toString() ?? '1.2') ?? 1.2;
@@ -129,7 +128,6 @@ class _MainScreenState extends State<MainScreen> {
       homeWinProb = 0.25;
     }
 
-    // Value Bet (Értékadó tipp) számítása a valódi piaci odds alapján (2. Szint)
     bool isValueBet = false;
     if (realOdds > 1.0 && homeWinProb > 0) {
       double calculatedFairOdds = 1 / homeWinProb;
@@ -165,7 +163,6 @@ class _MainScreenState extends State<MainScreen> {
 
   // --- 🪄 MECCSKATTINTÁSKOR FUTÓ VALÓDI ADATGYŰJTŐ ÉS MEGJELENÍTŐ MODUL ---
   void _analyze(Map<String, dynamic> m) {
-    // Először megnyitjuk a párbeszédpanelt egy töltőképernyővel
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -261,7 +258,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Háttérben futó hálózati adatgyűjtő az 1. és 2. szinthez
   Future<Map<String, dynamic>> _fetchRealDataAndAnalyze(Map<String, dynamic> m) async {
     var client = HttpClient();
     Map<String, dynamic> homeStats = {};
@@ -269,7 +265,6 @@ class _MainScreenState extends State<MainScreen> {
     double realOdds = 0.0;
 
     try {
-      // 1. Szint: Csapat statisztikák lekérése
       if (m['homeId'] != null && m['leagueId'] != null) {
         var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2026&league=${m['leagueId']}&team=${m['homeId']}'));
         statReq.headers.add('x-rapidapi-key', _apiKey);
@@ -287,7 +282,6 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
 
-      // 2. Szint: Élő/Elérhető oddsok lekérése a meccshez
       if (m['fixtureId'] != null) {
         var oddsReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/odds?fixture=${m['fixtureId']}'));
         oddsReq.headers.add('x-rapidapi-key', _apiKey);
@@ -346,7 +340,13 @@ class _MainScreenState extends State<MainScreen> {
         Text(conf, style: TextStyle(fontSize: 11, color: isBest ? Colors.amber : Colors.grey[400])),
       ]),
       const Spacer(),
-      Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isBest ? Colors.amber : null), textAlign: Alignment.centerRight as TextAlign?))
+      Expanded(
+        child: Text(
+          value, 
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isBest ? Colors.amber : null), 
+          textAlign: TextAlign.end, // Itt volt a hiba, Alignment helyett TextAlign kell ide!
+        ),
+      )
     ]),
   );
 
@@ -366,7 +366,7 @@ class _MainScreenState extends State<MainScreen> {
           String currentScore = (homeGoals.isNotEmpty && awayGoals.isNotEmpty) ? "  $homeGoals-$awayGoals " : "";
 
           return {
-            "fixtureId": m['fixture']['id'], // Megőrizzük az ID-kat az adatok lekéréséhez
+            "fixtureId": m['fixture']['id'],
             "leagueId": m['league']['id'],
             "homeId": m['teams']['home']['id'],
             "awayId": m['teams']['away']['id'],
