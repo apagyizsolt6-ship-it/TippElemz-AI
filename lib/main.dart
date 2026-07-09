@@ -98,7 +98,6 @@ class _MainScreenState extends State<MainScreen> {
     await file.writeAsString(json.encode(_savedTips));
   }
 
-  // --- 🧠 JAVÍTOTT, BOMBABIZTOS POISSON ENGINE VÁLTOZÓ DEKLARÁCIÓKKAL ---
   Map<String, dynamic> _calculateRealAiPredictions({
     required Map<String, dynamic> homeStats,
     required Map<String, dynamic> awayStats,
@@ -109,7 +108,6 @@ class _MainScreenState extends State<MainScreen> {
     int nameSeed = homeName.hashCode ^ awayName.hashCode;
     bool hasRealApiData = homeStats.isNotEmpty && awayStats.isNotEmpty;
 
-    // Kezdeti alapértelmezett értékek
     double homeAtt = 1.3;
     double homeDef = 1.2;
     double awayAtt = 1.1;
@@ -129,7 +127,6 @@ class _MainScreenState extends State<MainScreen> {
       }
     }
 
-    // Ha van valós API adat, felülírjuk az átlagokkal
     if (hasRealApiData) {
       homeAtt = double.tryParse(homeStats['goals']?['for']?['average']?['home']?.toString() ?? '') ?? homeAtt;
       awayDef = double.tryParse(awayStats['goals']?['against']?['average']?['away']?.toString() ?? '') ?? awayDef;
@@ -175,7 +172,7 @@ class _MainScreenState extends State<MainScreen> {
       "fouls": "Over $foulsLine", "foulsConf": "$foulsConf% Conf", "isFoulsBest": false,
       "cards": "Over $cardsLine", "cardsConf": "$cardsConf% Conf", "isCardsBest": false,
       "offsides": "Over 2.5", "offsidesConf": "65% Conf", "isOffsidesBest": false,
-      "marketOdds": realOdds > 1.0 ? realOdds.toStringAsFixed(2) : "N/A"
+      "marketOdds": realOdds // Tiszta double-ként adjuk át visszafele is!
     };
   }
 
@@ -200,8 +197,10 @@ class _MainScreenState extends State<MainScreen> {
               "fouls": "N/A", "foulsConf": "0%", "isFoulsBest": false,
               "cards": "N/A", "cardsConf": "0%", "isCardsBest": false,
               "offsides": "N/A", "offsidesConf": "0%", "isOffsidesBest": false,
-              "marketOdds": "N/A"
+              "marketOdds": 0.0
             };
+
+            double currentOdds = double.tryParse(ai['marketOdds'].toString()) ?? 0.0;
 
             return BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -228,10 +227,10 @@ class _MainScreenState extends State<MainScreen> {
                     Text("${m['away']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                     const SizedBox(height: 8),
                     Text("AI Predikció: ${ai['score']}", style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.w600, fontSize: 13)),
-                    if(ai['marketOdds'] != "N/A")
+                    if(currentOdds > 1.0)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text("Aktuális Piaci Odds: ${ai['marketOdds']}", style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                        child: Text("Aktuális Piaci Odds: ${currentOdds.toStringAsFixed(2)}", style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
                     const Divider(height: 24, thickness: 1),
                     _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'], ai['scoreConf'], Colors.blueAccent, isBest: ai['isScoreBest']),
@@ -247,12 +246,11 @@ class _MainScreenState extends State<MainScreen> {
                         icon: const Icon(Icons.bookmark_add_outlined),
                         label: const Text("Tipp mentése a listára", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                         onPressed: () {
-                          double parsedOdds = double.tryParse(ai['marketOdds'].toString()) ?? 2.0;
                           setState(() => _savedTips.add({
                             "match": "${m['home']} - ${m['away']}", 
                             "pick": "${ai['outcome']} (${ai['score']})",
                             "status": "pending",
-                            "odds": parsedOdds,
+                            "odds": currentOdds > 1.0 ? currentOdds : 2.0,
                             "stake": 10.0
                           }));
                           _saveTips(); 
@@ -456,8 +454,8 @@ class _MainScreenState extends State<MainScreen> {
 
     for (var t in _savedTips) {
       if (t['status'] == 'won' || t['status'] == 'lost') {
-        double stake = (t['stake'] ?? 10.0).toDouble();
-        double odds = (t['odds'] ?? 2.0).toDouble();
+        double stake = double.tryParse(t['stake']?.toString() ?? '10.0') ?? 10.0;
+        double odds = double.tryParse(t['odds']?.toString() ?? '2.0') ?? 2.0;
         totalStake += stake;
         if (t['status'] == 'won') {
           netProfit += (stake * odds) - stake;
@@ -681,6 +679,9 @@ class _MainScreenState extends State<MainScreen> {
                                   (_, i) {
                                     int realIndex = _savedTips.indexOf(settledTips[i]);
                                     bool isWon = settledTips[i]['status'] == 'won';
+                                    double displayOdds = double.tryParse(settledTips[i]['odds']?.toString() ?? '2.0') ?? 2.0;
+                                    double displayStake = double.tryParse(settledTips[i]['stake']?.toString() ?? '10.0') ?? 10.0;
+                                    
                                     return Container(
                                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
                                       decoration: BoxDecoration(
@@ -693,7 +694,7 @@ class _MainScreenState extends State<MainScreen> {
                                         title: Text(settledTips[i]['match'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                         subtitle: Padding(
                                           padding: const EdgeInsets.only(top: 4),
-                                          child: Text("${settledTips[i]['pick']}\nOdds: ${settledTips[i]['odds']}  |  Tét: ${settledTips[i]['stake']}", style: TextStyle(fontSize: 11, color: Colors.grey[400], height: 1.3)),
+                                          child: Text("${settledTips[i]['pick']}\nOdds: ${displayOdds.toStringAsFixed(2)}  |  Tét: ${displayStake.toStringAsFixed(0)} Ft", style: TextStyle(fontSize: 11, color: Colors.grey[400], height: 1.3)),
                                         ),
                                         trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.grey, size: 18), onPressed: () => setState(() { _savedTips.removeAt(realIndex); _saveTips(); })),
                                       ),
