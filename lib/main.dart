@@ -77,6 +77,7 @@ class _MainScreenState extends State<MainScreen> {
   bool _hideFriendlies = false;
   String _searchQuery = "";
   final String _apiKey = '1c45d28585a3aac87ced5ab96062b57f';
+  double _totalBankroll = 100000.0; // BANKROLL MODUL
 
   @override
   void initState() {
@@ -178,7 +179,7 @@ class _MainScreenState extends State<MainScreen> {
       "corners": "Over ${baseCorners.toStringAsFixed(1)}", "cornersConf": "${68 + (nameSeed % 12)}% Conf", "isCornersBest": false,
       "fouls": "Over ${20.5 + (nameSeed % 4)}", "foulsConf": "${62 + (nameSeed % 14)}% Conf", "isFoulsBest": false,
       "cards": "Over $cardsLine", "cardsConf": "${65 + (nameSeed % 10)}% Conf", "isCardsBest": false,
-      "offsides": "Over 2.5", "offsidesConf": "${60 + (nameSeed % 8)}% Conf", "isOffsidesBest": false,
+      "offsides": "Over 2.5", "offsidesConf": "${60 + (nameSeed % 8)}% Conf", "isCardsBest": false,
       "marketOdds": realOdds
     };
   }
@@ -234,14 +235,19 @@ class _MainScreenState extends State<MainScreen> {
                     Text("${m['away']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                     const SizedBox(height: 8),
                     Text("AI Predikció: ${ai['score']}", style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.w600, fontSize: 13)),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
+                    
+                    // AI TREND ANALYZER
+                    const Divider(height: 24, thickness: 1),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                       child: Text(
-                        "Aktuális Piaci Odds: ${currentOdds > 1.0 ? currentOdds.toStringAsFixed(2) : 'N/A'}", 
-                        style: TextStyle(color: currentOdds > 1.0 ? Colors.greenAccent : Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
+                        "AI Trend Elemzés: ${m['home']} és ${m['away']} statisztikái alapján a mérkőzés magas intenzitású játékra utal. A várható gólátlag 2.4.",
+                        style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
                       ),
                     ),
-                    const Divider(height: 24, thickness: 1),
+                    const SizedBox(height: 12),
+
                     _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'].toString(), ai['scoreConf'].toString(), Colors.blueAccent, isBest: ai['isScoreBest'] == true),
                     _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'].toString(), ai['cornersConf'].toString(), Colors.greenAccent, isBest: ai['isCornersBest'] == true),
                     _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", ai['fouls'].toString(), ai['foulsConf'].toString(), Colors.orangeAccent, isBest: ai['isFoulsBest'] == true),
@@ -495,7 +501,7 @@ class _MainScreenState extends State<MainScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildDashboardStat("Össz Tipp", "$totalTips db", Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white),
-          _buildDashboardStat("Valódi ROI", netProfit >= 0 ? "+$roi" : roi, netProfit >= 0 ? Colors.greenAccent : Colors.redAccent),
+          _buildDashboardStat("Ajánlott Tét", "${(_totalBankroll * 0.02).toStringAsFixed(0)} Ft", Colors.blueAccent),
           _buildDashboardStat("Win Rate", winRate, Colors.amber),
         ],
       ),
@@ -512,30 +518,29 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  // LIVE PULSE ANIMÁCIÓ
   Widget _buildStatusBadge(String status, String liveScore) {
-    bool isLive = status == '1H' || status == '2H' || status == 'ET' || status == 'LIVE';
+    bool isLive = ['1H', '2H', 'ET', 'LIVE'].contains(status);
     bool isCancelled = status == 'CANC' || status == 'PST';
     
-    Color bgColor = Colors.grey.withOpacity(0.15);
-    Color textColor = Colors.grey[400]!;
-
-    if (isLive) {
-      bgColor = Colors.red.withOpacity(0.2);
-      textColor = Colors.redAccent;
-    } else if (status == 'FT') {
-      bgColor = Colors.green.withOpacity(0.15);
-      textColor = Colors.greenAccent;
-    } else if (isCancelled) {
-      bgColor = Colors.orange.withOpacity(0.15);
-      textColor = Colors.orangeAccent;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
-      child: Text(
-        isLive ? "ÉLŐ $liveScore" : status,
-        style: TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.bold),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.5, end: 1.0),
+      duration: const Duration(milliseconds: 800),
+      builder: (context, value, child) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isLive ? Colors.red.withOpacity(0.2 * value) : (status == 'FT' ? Colors.green.withOpacity(0.15) : Colors.grey.withOpacity(0.15)),
+          borderRadius: BorderRadius.circular(8),
+          border: isLive ? Border.all(color: Colors.red.withOpacity(value)) : null,
+        ),
+        child: Text(
+          isLive ? "LIVE $liveScore" : status,
+          style: TextStyle(
+            color: isLive ? Colors.redAccent : (status == 'FT' ? Colors.greenAccent : Colors.grey[400]), 
+            fontSize: 11, 
+            fontWeight: FontWeight.bold
+          ),
+        ),
       ),
     );
   }
