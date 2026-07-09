@@ -61,10 +61,16 @@ class _MainScreenState extends State<MainScreen> {
   bool _isLoading = true;
   String _errorMessage = "";
   final String _apiKey = '56760560446768218fd8a38865651edd';
+  
+  // Dátumválasztó változói
+  late List<DateTime> _nextDays;
+  int _selectedDateIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    // Generáljuk le a mai napot és a következő 5 napot (összesen 6 nap)
+    _nextDays = List.generate(6, (index) => DateTime.now().add(Duration(days: index)));
     _loadMatches();
   }
 
@@ -76,13 +82,14 @@ class _MainScreenState extends State<MainScreen> {
 
     try {
       final client = HttpClient();
-      final dateStr = DateTime.now().toString().substring(0, 10);
       
-      // Hozzáadva az időzóna paraméter, hogy biztosan a mai magyar meccseket hozza
+      // A kiválasztott dátum lekérése formázva (YYYY-MM-DD)
+      final dateStr = _nextDays[_selectedDateIndex].toString().substring(0, 10);
+      
+      // Időzóna hozzáadva a pontos adatokért
       final uri = Uri.parse('https://v3.football.api-sports.io/fixtures?date=$dateStr&timezone=Europe/Budapest');
       
       final req = await client.getUrl(uri);
-      
       req.headers.set('x-rapidapi-key', _apiKey);
       req.headers.set('User-Agent', 'Mozilla/5.0');
       
@@ -94,7 +101,7 @@ class _MainScreenState extends State<MainScreen> {
         final List<dynamic> data = decoded['response'] ?? [];
         
         if (data.isEmpty) {
-          setState(() => _errorMessage = "Nincs mára kiírt meccs az API-ban.");
+          setState(() => _errorMessage = "Erre a napra ($dateStr) nincs meccs kiírva.");
         } else {
           setState(() {
             _matches = data.map((m) => {
@@ -106,11 +113,12 @@ class _MainScreenState extends State<MainScreen> {
                   : "--:--",
               "homeGoals": m['goals']?['home']?.toString() ?? "",
               "awayGoals": m['goals']?['away']?.toString() ?? "",
+              "league": m['league']?['name'] ?? "",
             }).toList().cast<Map<String, dynamic>>();
           });
         }
       } else {
-        setState(() => _errorMessage = "API Hiba!\nKód: ${res.statusCode}\nVálasz: $body");
+        setState(() => _errorMessage = "API Hiba!\nKód: ${res.statusCode}");
       }
     } catch (e) {
       setState(() => _errorMessage = "Hálózati Hiba Történt!\n$e");
@@ -123,7 +131,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("AI PRO - ALAP TESZT"),
+        title: const Text("AI PRO - NAPTÁR"),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -135,38 +143,139 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ],
       ),
-      body: _isLoading 
-          ? const Center(child: CircularProgressIndicator(color: Colors.amber))
-          : _errorMessage.isNotEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Text(
-                      _errorMessage, 
-                      style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
+      body: Column(
+        children: [
+          // Vízszintes dátumválasztó (Flashscore stílusban)
+          Container(
+            height: 65,
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _nextDays.length,
+              itemBuilder: (context, index) {
+                final date = _nextDays[index];
+                final isSelected = index == _selectedDateIndex;
+                
+                // Formázás (pl. "07. 10.")
+                final displayDate = DateFormat('MM. dd.').format(date);
+                // Nap neve rövidítve
+                final dayName = DateFormat('E').format(date); 
+                
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedDateIndex = index;
+                    });
+                    _loadMatches(); // Betöltjük a kiválasztott nap meccseit
+                  },
+                  child: Container(
+                    width: 75,
+                    margin: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.amber : Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isSelected ? Colors.amber : Colors.grey.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          index == 0 ? "MA" : (index == 1 ? "HOLNAP" : dayName.toUpperCase()),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                            color: isSelected ? Colors.black : Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          displayDate,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: isSelected ? Colors.black : (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                )
-              : ListView.builder(
-                  itemCount: _matches.length,
-                  itemBuilder: (context, index) {
-                    final match = _matches[index];
-                    
-                    // Score megjelenítése ha már megy a meccs vagy vége
-                    bool hasScore = match['homeGoals'].toString().isNotEmpty && match['awayGoals'].toString().isNotEmpty;
-                    String scoreText = hasScore ? " ${match['homeGoals']} - ${match['awayGoals']} " : "";
-                    
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        title: Text("${match['home']} - ${match['away']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text("Kezdés: ${match['time']}$scoreText"),
-                        trailing: Text(match['status'], style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                );
+              },
+            ),
+          ),
+          
+          // Meccsek listája
+          Expanded(
+            child: _isLoading 
+                ? const Center(child: CircularProgressIndicator(color: Colors.amber))
+                : _errorMessage.isNotEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Text(
+                            _errorMessage, 
+                            style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _matches.length,
+                        itemBuilder: (context, index) {
+                          final match = _matches[index];
+                          
+                          bool hasScore = match['homeGoals'].toString().isNotEmpty && match['awayGoals'].toString().isNotEmpty;
+                          String scoreText = hasScore ? "  ${match['homeGoals']} - ${match['awayGoals']} " : "";
+                          
+                          return Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    match['league'], 
+                                    style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          "${match['home']} - ${match['away']}", 
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(8)
+                                        ),
+                                        child: Text(
+                                          match['status'], 
+                                          style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12)
+                                        ),
+                                      )
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    "Kezdés: ${match['time']}$scoreText",
+                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
+          ),
+        ],
+      ),
     );
   }
 }
