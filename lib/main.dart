@@ -108,13 +108,11 @@ class _MainScreenState extends State<MainScreen> {
   }) {
     int nameSeed = homeName.hashCode ^ awayName.hashCode;
     
-    // Ha az API-ból jön adat, azt használjuk, ha nem, akkor a csapatnév alapú egyedi seedet
     double defaultHomeAtt = 1.2 + ((nameSeed % 7) / 5.0);
     double defaultAwayDef = 1.0 + (((nameSeed >> 2) % 6) / 5.0);
     double defaultAwayAtt = 1.0 + (((nameSeed >> 4) % 6) / 5.0);
     double defaultHomeDef = 1.1 + (((nameSeed >> 6) % 6) / 5.0);
 
-    // Kinyerjük a gólátlagokat az API válaszból (ha léteznek)
     double homeAtt = double.tryParse(homeStats['goals']?['for']?['average']?['home']?.toString() ?? '') ?? defaultHomeAtt;
     double awayDef = double.tryParse(awayStats['goals']?['against']?['average']?['away']?.toString() ?? '') ?? defaultAwayDef;
     double awayAtt = double.tryParse(awayStats['goals']?['for']?['average']?['away']?.toString() ?? '') ?? defaultAwayAtt;
@@ -280,7 +278,6 @@ class _MainScreenState extends State<MainScreen> {
     double realOdds = 0.0;
 
     try {
-      // ITT FRISSÍTETTEM: season=2025-re, hogy az épp futó bajnokságokat behúzza az API!
       if (m['homeId'] != null && m['leagueId'] != null) {
         var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2025&league=${m['leagueId']}&team=${m['homeId']}'));
         statReq.headers.add('x-rapidapi-key', _apiKey);
@@ -506,7 +503,7 @@ class _MainScreenState extends State<MainScreen> {
       textColor = Colors.redAccent;
     } else if (status == 'FT') {
       bgColor = Colors.green.withOpacity(0.15);
- greenAccent;
+      textColor = Colors.greenAccent; // <-- ITT JAVÍTVA!
     } else if (isCancelled) {
       bgColor = Colors.orange.withOpacity(0.15);
       textColor = Colors.orangeAccent;
