@@ -98,6 +98,7 @@ class _MainScreenState extends State<MainScreen> {
     await file.writeAsString(json.encode(_savedTips));
   }
 
+  // --- 🧠 JAVÍTOTT, BOMBABIZTOS POISSON ENGINE ---
   Map<String, dynamic> _calculateRealAiPredictions({
     required Map<String, dynamic> homeStats,
     required Map<String, dynamic> awayStats,
@@ -108,6 +109,7 @@ class _MainScreenState extends State<MainScreen> {
     int nameSeed = homeName.hashCode ^ awayName.hashCode;
     bool hasRealApiData = homeStats.isNotEmpty && awayStats.isNotEmpty;
 
+    // Itt vettem ki a duplázott deklarációkat (double homeAtt és awayAtt)
     double homeAtt = 1.3;
     double homeDef = 1.2;
     double awayAtt = 1.1;
@@ -172,7 +174,7 @@ class _MainScreenState extends State<MainScreen> {
       "fouls": "Over $foulsLine", "foulsConf": "$foulsConf% Conf", "isFoulsBest": false,
       "cards": "Over $cardsLine", "cardsConf": "$cardsConf% Conf", "isCardsBest": false,
       "offsides": "Over 2.5", "offsidesConf": "65% Conf", "isOffsidesBest": false,
-      "marketOdds": realOdds // Tiszta double-ként adjuk át visszafele is!
+      "marketOdds": realOdds // JAVÍTÁS: Szöveges "N/A" helyett tisztán double számot ad vissza
     };
   }
 
@@ -197,7 +199,7 @@ class _MainScreenState extends State<MainScreen> {
               "fouls": "N/A", "foulsConf": "0%", "isFoulsBest": false,
               "cards": "N/A", "cardsConf": "0%", "isCardsBest": false,
               "offsides": "N/A", "offsidesConf": "0%", "isOffsidesBest": false,
-              "marketOdds": 0.0
+              "marketOdds": 0.0 // JAVÍTÁS: Itt is double a fallback
             };
 
             double currentOdds = double.tryParse(ai['marketOdds'].toString()) ?? 0.0;
@@ -227,11 +229,13 @@ class _MainScreenState extends State<MainScreen> {
                     Text("${m['away']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                     const SizedBox(height: 8),
                     Text("AI Predikció: ${ai['score']}", style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.w600, fontSize: 13)),
-                    if(currentOdds > 1.0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text("Aktuális Piaci Odds: ${currentOdds.toStringAsFixed(2)}", style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        "Aktuális Piaci Odds: ${currentOdds > 1.0 ? currentOdds.toStringAsFixed(2) : 'N/A'}", 
+                        style: TextStyle(color: currentOdds > 1.0 ? Colors.greenAccent : Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
+                    ),
                     const Divider(height: 24, thickness: 1),
                     _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'], ai['scoreConf'], Colors.blueAccent, isBest: ai['isScoreBest']),
                     _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'], ai['cornersConf'], Colors.greenAccent, isBest: ai['isCornersBest']),
