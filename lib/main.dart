@@ -236,7 +236,6 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // SZŰRÉSI LOGIKA JAVÍTÁSA ÉS BŐVÍTÉSE
     final filteredMatches = _allMatches.where((m) {
       // 1. Kereső szűrő
       bool matchesSearch = m['home']?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? true;
@@ -244,13 +243,20 @@ class _MainScreenState extends State<MainScreen> {
       // 2. Élő meccs szűrő
       bool matchesLive = !_isLiveOnly || m['status'] == '1H' || m['status'] == '2H' || m['status'] == 'ET' || m['status'] == 'LIVE';
       
-      // 3. Barátságos meccsek szűrése (Javítva: mind a liga nevet, mind a csapat nevet ellenőrzi a biztonság kedvéért)
-      bool isFriendly = (m['league']?.toString().toLowerCase().contains('friendly') ?? false) || 
-                       (m['league']?.toString().toLowerCase().contains('barátságos') ?? false) ||
-                       (m['home']?.toString().toLowerCase().contains('friendly') ?? false);
+      // 3. Barátságos meccsek szűrése (GOLYÓÁLLÓ JAVÍTÁS: "friendlies" és "friend" szótövekre is szűr)
+      String leagueName = m['league']?.toString().toLowerCase() ?? "";
+      String homeName = m['home']?.toString().toLowerCase() ?? "";
+      
+      bool isFriendly = leagueName.contains('friendly') || 
+                       leagueName.contains('friendlies') || 
+                       leagueName.contains('friend') || 
+                       leagueName.contains('barátságos') ||
+                       homeName.contains('friendly') ||
+                       homeName.contains('friendlies');
+                       
       bool matchesFriendly = !_hideFriendlies || !isFriendly;
 
-      // 4. ÚJ: Már lejátszott, befejezett meccsek elrejtése (FT = Full Time, AET = After Extra Time, PEN = Penalties)
+      // 4. Már lejátszott, befejezett meccsek elrejtése
       bool isFinished = m['status'] == 'FT' || m['status'] == 'AET' || m['status'] == 'PEN' || m['status'] == 'PST';
       bool matchesNotFinished = !isFinished;
 
