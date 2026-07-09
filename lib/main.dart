@@ -5,281 +5,75 @@ import 'package:intl/intl.dart';
 
 void main() => runApp(const MyApp());
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  ThemeMode _themeMode = ThemeMode.dark;
-  void toggleTheme() => setState(() => _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.light,
-        primaryColor: Colors.amber,
-        scaffoldBackgroundColor: const Color(0xFFF5F5F7),
-        cardColor: Colors.white,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actionsIconTheme: IconThemeData(color: Colors.black),
-          titleTextStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-      ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: Colors.amber,
-        scaffoldBackgroundColor: const Color(0xFF0A1128),
-        cardColor: const Color(0xFF101F42),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actionsIconTheme: IconThemeData(color: Colors.white),
-          titleTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-      ),
-      themeMode: _themeMode,
-      home: MainScreen(toggleTheme: toggleTheme),
+      home: const MainScreen(),
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
-  final VoidCallback toggleTheme;
-  const MainScreen({super.key, required this.toggleTheme});
+  const MainScreen({super.key});
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  List<Map<String, dynamic>> _matches = [];
+  List<dynamic> _matches = [];
   bool _isLoading = true;
-  String _errorMessage = "";
-  
-  // A fotón szereplő API kulcsod
-  final String _apiKey = 'd73003bb74642f696d0c0b1785330e4f';
-  
-  late List<DateTime> _nextDays;
-  int _selectedDateIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _nextDays = List.generate(6, (index) => DateTime.now().add(Duration(days: index)));
-    _loadMatches();
+    _fetchMatches();
   }
 
-  Future<void> _loadMatches() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = "";
-    });
-
+  Future<void> _fetchMatches() async {
     try {
       final client = HttpClient();
-      
-      final dateStr = _nextDays[_selectedDateIndex].toString().substring(0, 10);
-      final uri = Uri.parse('https://v3.football.api-sports.io/fixtures?date=$dateStr&timezone=Europe/Budapest');
-      
+      // A football-data.org nyilvános végpontja a mai meccsekre
+      final uri = Uri.parse('https://api.football-data.org/v4/matches');
       final req = await client.getUrl(uri);
       
-      // A KULCSFONTOSSÁGÚ JAVÍTÁS: 'x-apisports-key' a közvetlen regisztrációhoz
-      req.headers.set('x-apisports-key', _apiKey);
-      req.headers.set('User-Agent', 'Mozilla/5.0');
-      
+      // Ide nem kell bonyolult kulcs, ez egy nyitottabb API
       final res = await req.close();
       final body = await res.transform(utf8.decoder).join();
       
       if (res.statusCode == 200) {
-        final decoded = json.decode(body);
-        
-        final errors = decoded['errors'];
-        if (errors != null && errors is Map && errors.isNotEmpty) {
-          setState(() => _errorMessage = "API KORLÁTOZÁS VAGY HIBA:\n${errors.values.join('\n')}");
-          return;
-        }
-
-        final List<dynamic> data = decoded['response'] ?? [];
-        
-        if (data.isEmpty) {
-          setState(() => _errorMessage = "Erre a napra ($dateStr) nincs meccs az adatbázisban.");
-        } else {
-          setState(() {
-            _matches = data.map((m) => {
-              "home": m['teams']?['home']?['name'] ?? "Ismeretlen",
-              "away": m['teams']?['away']?['name'] ?? "Ismeretlen",
-              "status": m['fixture']?['status']?['short'] ?? "-",
-              "time": m['fixture']?['date'] != null 
-                  ? DateFormat('HH:mm').format(DateTime.parse(m['fixture']['date']).toLocal()) 
-                  : "--:--",
-              "homeGoals": m['goals']?['home']?.toString() ?? "",
-              "awayGoals": m['goals']?['away']?.toString() ?? "",
-              "league": m['league']?['name'] ?? "",
-            }).toList().cast<Map<String, dynamic>>();
-          });
-        }
-      } else if (res.statusCode == 403) {
-         setState(() => _errorMessage = "API Hiba (403): A szerver elutasította a kulcsot.\nGyőződj meg róla, hogy a fiókod aktív-e.");
-      } else {
-        setState(() => _errorMessage = "Szerver Hiba!\nKód: ${res.statusCode}");
+        final data = json.decode(body);
+        setState(() {
+          _matches = data['matches'] ?? [];
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      setState(() => _errorMessage = "Hálózati Hiba Történt!\n$e");
-    } finally {
-      setState(() => _isLoading = false);
+      debugPrint("Hiba: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("AI PRO - NAPTÁR"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadMatches,
-          ),
-          IconButton(
-            icon: const Icon(Icons.brightness_6),
-            onPressed: widget.toggleTheme,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Container(
-            height: 65,
-            margin: const EdgeInsets.symmetric(vertical: 8),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _nextDays.length,
+      appBar: AppBar(title: const Text("FOCI MECCSEK (STABIL)")),
+      body: _isLoading 
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: _matches.length,
               itemBuilder: (context, index) {
-                final date = _nextDays[index];
-                final isSelected = index == _selectedDateIndex;
-                
-                final displayDate = DateFormat('MM. dd.').format(date);
-                final dayName = DateFormat('E').format(date); 
-                
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedDateIndex = index;
-                    });
-                    _loadMatches();
-                  },
-                  child: Container(
-                    width: 75,
-                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.amber : Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: isSelected ? Colors.amber : Colors.grey.withOpacity(0.3)),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          index == 0 ? "MA" : (index == 1 ? "HOLNAP" : dayName.toUpperCase()),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
-                            color: isSelected ? Colors.black : Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          displayDate,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: isSelected ? Colors.black : (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                          ),
-                        ),
-                      ],
-                    ),
+                final match = _matches[index];
+                return Card(
+                  margin: const EdgeInsets.all(8),
+                  child: ListTile(
+                    title: Text("${match['homeTeam']['name']} - ${match['awayTeam']['name']}"),
+                    subtitle: Text("Státusz: ${match['status']}"),
                   ),
                 );
               },
             ),
-          ),
-          
-          Expanded(
-            child: _isLoading 
-                ? const Center(child: CircularProgressIndicator(color: Colors.amber))
-                : _errorMessage.isNotEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20.0),
-                          child: Text(
-                            _errorMessage, 
-                            style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _matches.length,
-                        itemBuilder: (context, index) {
-                          final match = _matches[index];
-                          
-                          bool hasScore = match['homeGoals'].toString().isNotEmpty && match['awayGoals'].toString().isNotEmpty;
-                          String scoreText = hasScore ? "  ${match['homeGoals']} - ${match['awayGoals']} " : "";
-                          
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    match['league'], 
-                                    style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          "${match['home']} - ${match['away']}", 
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.amber.withOpacity(0.2),
-                                          borderRadius: BorderRadius.circular(8)
-                                        ),
-                                        child: Text(
-                                          match['status'], 
-                                          style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12)
-                                        ),
-                                      )
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    "Kezdés: ${match['time']}$scoreText",
-                                    style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
     );
   }
 }
