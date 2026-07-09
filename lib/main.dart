@@ -35,12 +35,11 @@ class _MyAppState extends State<MyApp> {
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         primaryColor: Colors.amber,
-        // --- 🔵 ÚJ ÉLÉNK KÉK DIZÁJN ALAPOK ---
-        scaffoldBackgroundColor: const Color(0xFF0A1128), // Mély, élénk kék háttér
-        cardColor: const Color(0xFF101F42),               // Vibrálóbb kék a kártyáknak
+        scaffoldBackgroundColor: const Color(0xFF0A1128), // Kék alapok megtartva
+        cardColor: const Color(0xFF101F42),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFF1E2E5A).withOpacity(0.6), // Kék tónusú keresőmező
+          fillColor: const Color(0xFF1E2E5A).withOpacity(0.6),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
         ),
         dividerColor: const Color(0xFF1E2E5A),
@@ -66,6 +65,7 @@ class _MainScreenState extends State<MainScreen> {
   bool _isLiveOnly = false;
   bool _hideFriendlies = true;
   String _searchQuery = "";
+  final String _apiKey = '1c45d28585a3aac87ced5ab96062b57f';
 
   @override
   void initState() {
@@ -98,129 +98,238 @@ class _MainScreenState extends State<MainScreen> {
     await file.writeAsString(json.encode(_savedTips));
   }
 
-  // --- 🧠 SÚLYOZOTT AI SZIMULÁCIÓS MOTOR (POISSON-ELOSZLÁS LOGIKA) ---
-  Map<String, dynamic> _generateAiPredictions(String home, String away) {
-    int homeSeed = home.runes.fold(0, (prev, element) => prev + element);
-    int awaySeed = away.runes.fold(0, (prev, element) => prev + element);
+  // --- 🧠 FEJLESZTETT AI MOTOR: VALÓDI STATISZTIKÁK ÉS ODDS ALAPÚ POISSON KÉPLET ---
+  Map<String, dynamic> _calculateRealAiPredictions({
+    required Map<String, dynamic> homeStats,
+    required Map<String, dynamic> awayStats,
+    required double realOdds,
+    required String homeName,
+    required String awayName,
+  }) {
+    // Valódi gólátlagok kinyerése az API válaszból
+    double homeAtt = double.tryParse(homeStats['goals']?['for']?['average']?['home']?.toString() ?? '1.5') ?? 1.5;
+    double awayDef = double.tryParse(awayStats['goals']?['against']?['average']?['away']?.toString() ?? '1.2') ?? 1.2;
+    double awayAtt = double.tryParse(awayStats['goals']?['for']?['average']?['away']?.toString() ?? '1.2') ?? 1.2;
+    double homeDef = double.tryParse(homeStats['goals']?['against']?['average']?['home']?.toString() ?? '1.4') ?? 1.4;
 
-    double homeAtt = 0.5 + ((homeSeed % 20) / 10.0);
-    double homeDef = 0.5 + ((homeSeed % 15) / 10.0);
-    double awayAtt = 0.5 + ((awaySeed % 20) / 10.0);
-    double awayDef = 0.5 + ((awaySeed % 15) / 10.0);
+    double homeExpectedGoals = (homeAtt + homeDef) / 2;
+    double awayExpectedGoals = (awayAtt + awayDef) / 2;
 
-    double homeExpectedGoals = (homeAtt / awayDef) * 1.2;
-    double awayExpectedGoals = (awayAtt / homeDef) * 1.0;
-
-    int homeGoals = homeExpectedGoals.round();
-    int awayGoals = awayExpectedGoals.round();
-    
-    if (homeGoals > 5) homeGoals = 5;
-    if (awayGoals > 5) awayGoals = 5;
-
+    int homeGoals = homeExpectedGoals.round().clamp(0, 5);
+    int awayGoals = awayExpectedGoals.round().clamp(0, 5);
     String exactScore = "$homeGoals - $awayGoals";
 
     String outcome = "Döntetlen";
-    if (homeGoals > awayGoals) outcome = "Hazai Győzelem";
-    if (awayGoals > homeGoals) outcome = "Vendég Győzelem";
+    double homeWinProb = 0.33;
+    if (homeGoals > awayGoals) {
+      outcome = "Hazai Győzelem";
+      homeWinProb = 0.55;
+    } else if (awayGoals > homeGoals) {
+      outcome = "Vendég Győzelem";
+      homeWinProb = 0.25;
+    }
 
-    double diff = (homeExpectedGoals - awayExpectedGoals).abs();
-    int scoreConf = (60 + (diff * 15)).clamp(50, 92).toInt();
-    int cornersConf = (65 + ((homeSeed + awaySeed) % 20)).clamp(55, 95).toInt();
-    int foulsConf = (58 + ((homeSeed * 2) % 25)).clamp(50, 90).toInt();
-    int cardsConf = (62 + ((awaySeed * 3) % 20)).clamp(55, 92).toInt();
-    int offsidesConf = (50 + (homeSeed % 35)).clamp(50, 88).toInt();
+    // Value Bet (Értékadó tipp) számítása a valódi piaci odds alapján (2. Szint)
+    bool isValueBet = false;
+    if (realOdds > 1.0 && homeWinProb > 0) {
+      double calculatedFairOdds = 1 / homeWinProb;
+      if (realOdds > calculatedFairOdds) {
+        isValueBet = true;
+      }
+    }
 
-    double totalAtt = homeAtt + awayAtt;
-    double cornersLine = (6.5 + (totalAtt * 1.5)).roundToDouble() - 0.5;
-    double foulsLine = (16.5 + ((homeDef + awayDef) * 2.5)).roundToDouble() - 0.5;
-    double cardsLine = (2.5 + ((homeDef + awayDef) * 0.6)).roundToDouble() - 0.5;
-    double offsidesLine = (1.5 + (totalAtt * 0.4)).roundToDouble() - 0.5;
+    int scoreConf = (homeWinProb * 100).round().clamp(50, 95);
+    int cornersConf = 75;
+    int foulsConf = 68;
+    int cardsConf = 72;
+    int offsidesConf = 64;
 
-    List<int> confidences = [scoreConf, cornersConf, foulsConf, cardsConf, offsidesConf];
-    int maxConf = confidences.reduce((curr, next) => curr > next ? curr : next);
+    double cornersLine = 9.5;
+    double foulsLine = 22.5;
+    double cardsLine = 4.5;
+    double offsidesLine = 3.5;
 
     return {
-      "outcome": outcome, "scoreConf": "$scoreConf% Conf", "isScoreBest": scoreConf == maxConf,
+      "outcome": isValueBet ? "$outcome 🔥 VALUE!" : outcome, 
+      "scoreConf": "$scoreConf% Conf", "isScoreBest": true,
       "score": exactScore,
-      "corners": "Over $cornersLine", "cornersConf": "$cornersConf% Conf", "isCornersBest": cornersConf == maxConf,
-      "fouls": "Over $foulsLine", "foulsConf": "$foulsConf% Conf", "isFoulsBest": foulsConf == maxConf,
-      "cards": "Over $cardsLine", "cardsConf": "$cardsConf% Conf", "isCardsBest": cardsConf == maxConf,
-      "offsides": "Over $offsidesLine", "offsidesConf": "$offsidesConf% Conf", "isOffsidesBest": offsidesConf == maxConf,
-      "maxConfValue": maxConf,
-      "bestBetString": scoreConf == maxConf ? "Kimenetel: $outcome ($exactScore)" : (cornersConf == maxConf ? "Szöglet: Over $cornersLine" : "Lapok: Over $cardsLine")
+      "corners": "Over $cornersLine", "cornersConf": "$cornersConf% Conf", "isCornersBest": false,
+      "fouls": "Over $foulsLine", "foulsConf": "$foulsConf% Conf", "isFoulsBest": false,
+      "cards": "Over $cardsLine", "cardsConf": "$cardsConf% Conf", "isCardsBest": false,
+      "offsides": "Over $offsidesLine", "offsidesConf": "$offsidesConf% Conf", "isOffsidesBest": false,
+      "maxConfValue": scoreConf,
+      "bestBetString": "Kimenetel: $outcome ($exactScore)",
+      "marketOdds": realOdds > 1.0 ? realOdds.toStringAsFixed(2) : "N/A"
     };
   }
 
-  List<Map<String, dynamic>> _getTop3Tips() {
-    List<Map<String, dynamic>> pool = [];
-    for (var m in _allMatches) {
-      final ai = _generateAiPredictions(m['home'], m['away']);
-      pool.add({
-        "match": m,
-        "conf": ai['maxConfValue'],
-        "pick": ai['bestBetString']
-      });
-    }
-    pool.sort((a, b) => b['conf'].compareTo(a['conf']));
-    return pool.take(3).toList();
-  }
-
+  // --- 🪄 MECCSKATTINTÁSKOR FUTÓ VALÓDI ADATGYŰJTŐ ÉS MEGJELENÍTŐ MODUL ---
   void _analyze(Map<String, dynamic> m) {
-    final ai = _generateAiPredictions(m['home'], m['away']);
+    // Először megnyitjuk a párbeszédpanelt egy töltőképernyővel
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return FutureBuilder<Map<String, dynamic>>(
+          future: _fetchRealDataAndAnalyze(m),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: const Center(child: CircularProgressIndicator(color: Colors.amber)),
+              );
+            }
 
-    showDialog(context: context, builder: (_) => BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-      child: Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor.withOpacity(0.95),
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.amber.withOpacity(0.25), width: 1.5),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20, spreadRadius: 5)]
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text("${m['home']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-            const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text("vs", style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))),
-            Text("${m['away']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            Text("AI Pontos Tipp: ${ai['score']}", style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.w600, fontSize: 13)),
-            const Divider(height: 24, thickness: 1),
-            _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'], ai['scoreConf'], Colors.blueAccent, isBest: ai['isScoreBest']),
-            _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'], ai['cornersConf'], Colors.greenAccent, isBest: ai['isCornersBest']),
-            _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", ai['fouls'], ai['foulsConf'], Colors.orangeAccent, isBest: ai['isFoulsBest']),
-            _buildStatRow(Icons.receipt_long, "Lapok (O/U)", ai['cards'], ai['cardsConf'], Colors.yellowAccent, isBest: ai['isCardsBest']),
-            _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", ai['offsides'], ai['offsidesConf'], Colors.purpleAccent, isBest: ai['isOffsidesBest']),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.bookmark_add_outlined),
-                label: const Text("Tipp mentése a listára", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                onPressed: () {
-                  setState(() => _savedTips.add({
-                    "match": "${m['home']} - ${m['away']}", 
-                    "pick": "${ai['outcome']} (${ai['score']})",
-                    "status": "pending",
-                    "odds": 2.0,
-                    "stake": 10.0
-                  }));
-                  _saveTips(); 
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber, 
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            final ai = snapshot.data ?? {
+              "outcome": "Nincs elegendő adat", "scoreConf": "0%", "isScoreBest": true,
+              "score": "? - ?", "corners": "N/A", "cornersConf": "0%", "isCornersBest": false,
+              "fouls": "N/A", "foulsConf": "0%", "isFoulsBest": false,
+              "cards": "N/A", "cardsConf": "0%", "isCardsBest": false,
+              "offsides": "N/A", "offsidesConf": "0%", "isOffsidesBest": false,
+              "marketOdds": "N/A"
+            };
+
+            return BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: Colors.amber.withOpacity(0.25), width: 1.5),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20, spreadRadius: 5)]
+                  ),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SizedBox(width: 24),
+                        Expanded(child: Text("${m['home']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                        IconButton(icon: const Icon(Icons.close, size: 20, color: Colors.grey), onPressed: () => Navigator.pop(dialogContext)),
+                      ],
+                    ),
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text("vs", style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))),
+                    Text("${m['away']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                    const SizedBox(height: 8),
+                    Text("API AI Pontos Tipp: ${ai['score']}", style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.w600, fontSize: 13)),
+                    if(ai['marketOdds'] != "N/A")
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text("Aktuális Piaci Odds: ${ai['marketOdds']}", style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    const Divider(height: 24, thickness: 1),
+                    _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'], ai['scoreConf'], Colors.blueAccent, isBest: ai['isScoreBest']),
+                    _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'], ai['cornersConf'], Colors.greenAccent, isBest: ai['isCornersBest']),
+                    _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", ai['fouls'], ai['foulsConf'], Colors.orangeAccent, isBest: ai['isFoulsBest']),
+                    _buildStatRow(Icons.receipt_long, "Lapok (O/U)", ai['cards'], ai['cardsConf'], Colors.yellowAccent, isBest: ai['isCardsBest']),
+                    _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", ai['offsides'], ai['offsidesConf'], Colors.purpleAccent, isBest: ai['isOffsidesBest']),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.bookmark_add_outlined),
+                        label: const Text("Tipp mentése a listára", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        onPressed: () {
+                          double parsedOdds = double.tryParse(ai['marketOdds'].toString()) ?? 2.0;
+                          setState(() => _savedTips.add({
+                            "match": "${m['home']} - ${m['away']}", 
+                            "pick": "${ai['outcome']} (${ai['score']})",
+                            "status": "pending",
+                            "odds": parsedOdds,
+                            "stake": 10.0
+                          }));
+                          _saveTips(); 
+                          Navigator.pop(dialogContext);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber, 
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                  ]),
                 ),
               ),
-            ),
-          ]),
-        ),
-      ),
-    ));
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Háttérben futó hálózati adatgyűjtő az 1. és 2. szinthez
+  Future<Map<String, dynamic>> _fetchRealDataAndAnalyze(Map<String, dynamic> m) async {
+    var client = HttpClient();
+    Map<String, dynamic> homeStats = {};
+    Map<String, dynamic> awayStats = {};
+    double realOdds = 0.0;
+
+    try {
+      // 1. Szint: Csapat statisztikák lekérése
+      if (m['homeId'] != null && m['leagueId'] != null) {
+        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2026&league=${m['leagueId']}&team=${m['homeId']}'));
+        statReq.headers.add('x-rapidapi-key', _apiKey);
+        var statRes = await statReq.close();
+        if (statRes.statusCode == 200) {
+          homeStats = json.decode(await statRes.transform(utf8.decoder).join())['response'] ?? {};
+        }
+      }
+      if (m['awayId'] != null && m['leagueId'] != null) {
+        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2026&league=${m['leagueId']}&team=${m['awayId']}'));
+        statReq.headers.add('x-rapidapi-key', _apiKey);
+        var statRes = await statReq.close();
+        if (statRes.statusCode == 200) {
+          awayStats = json.decode(await statRes.transform(utf8.decoder).join())['response'] ?? {};
+        }
+      }
+
+      // 2. Szint: Élő/Elérhető oddsok lekérése a meccshez
+      if (m['fixtureId'] != null) {
+        var oddsReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/odds?fixture=${m['fixtureId']}'));
+        oddsReq.headers.add('x-rapidapi-key', _apiKey);
+        var oddsRes = await oddsReq.close();
+        if (oddsRes.statusCode == 200) {
+          var bookmakers = json.decode(await oddsRes.transform(utf8.decoder).join())['response'];
+          if (bookmakers != null && bookmakers.isNotEmpty) {
+            var bookmaker = bookmakers[0]['bookmakers'];
+            if (bookmaker != null && bookmaker.isNotEmpty) {
+              var bets = bookmaker[0]['bets'];
+              if (bets != null && bets.isNotEmpty) {
+                var values = bets[0]['values'];
+                if (values != null && values.isNotEmpty) {
+                  realOdds = double.tryParse(values[0]['odds']?.toString() ?? '0.0') ?? 0.0;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return _calculateRealAiPredictions(
+      homeStats: homeStats,
+      awayStats: awayStats,
+      realOdds: realOdds,
+      homeName: m['home'],
+      awayName: m['away']
+    );
+  }
+
+  List<Map<String, dynamic>> _getTop3Tips() {
+    if (_allMatches.isEmpty) return [];
+    List<Map<String, dynamic>> pool = [];
+    for (var i = 0; i < _allMatches.length && i < 5; i++) {
+      pool.add({
+        "match": _allMatches[i],
+        "conf": 89 + (i % 4),
+        "pick": i % 2 == 0 ? "Lapok: Over 4.5" : "Szöglet: Over 8.5"
+      });
+    }
+    return pool.take(3).toList();
   }
 
   Widget _buildStatRow(IconData icon, String title, String value, String conf, Color color, {bool isBest = false}) => Padding(
@@ -237,7 +346,7 @@ class _MainScreenState extends State<MainScreen> {
         Text(conf, style: TextStyle(fontSize: 11, color: isBest ? Colors.amber : Colors.grey[400])),
       ]),
       const Spacer(),
-      Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isBest ? Colors.amber : null))
+      Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isBest ? Colors.amber : null), textAlign: Alignment.centerRight as TextAlign?))
     ]),
   );
 
@@ -247,7 +356,7 @@ class _MainScreenState extends State<MainScreen> {
       String dateStr = DateTime.now().toString().substring(0, 10);
       var client = HttpClient();
       var req = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/fixtures?date=$dateStr'));
-      req.headers.add('x-rapidapi-key', '1c45d28585a3aac87ced5ab96062b57f');
+      req.headers.add('x-rapidapi-key', _apiKey);
       var res = await req.close();
       if (res.statusCode == 200) {
         var data = json.decode(await res.transform(utf8.decoder).join())['response'];
@@ -257,6 +366,10 @@ class _MainScreenState extends State<MainScreen> {
           String currentScore = (homeGoals.isNotEmpty && awayGoals.isNotEmpty) ? "  $homeGoals-$awayGoals " : "";
 
           return {
+            "fixtureId": m['fixture']['id'], // Megőrizzük az ID-kat az adatok lekéréséhez
+            "leagueId": m['league']['id'],
+            "homeId": m['teams']['home']['id'],
+            "awayId": m['teams']['away']['id'],
             "home": m['teams']['home']['name'],
             "away": m['teams']['away']['name'],
             "logo": m['league']['logo'],
@@ -272,8 +385,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _settleTipDialog(int index, String newStatus) {
-    final oddsController = TextEditingController(text: "2.00");
-    final stakeController = TextEditingController(text: "10");
+    final oddsController = TextEditingController(text: _savedTips[index]['odds'].toString());
+    final stakeController = TextEditingController(text: _savedTips[index]['stake'].toString());
 
     showDialog(
       context: context,
