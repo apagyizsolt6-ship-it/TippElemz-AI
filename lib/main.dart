@@ -81,12 +81,13 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final client = HttpClient();
       
-      // A valódi, pontos dátum lekérése!
       final dateStr = _nextDays[_selectedDateIndex].toString().substring(0, 10);
       final uri = Uri.parse('https://v3.football.api-sports.io/fixtures?date=$dateStr&timezone=Europe/Budapest');
       
       final req = await client.getUrl(uri);
-      req.headers.set('x-rapidapi-key', _apiKey);
+      
+      // FIGYELEM: Itt van a változás! 'x-rapidapi-key' helyett 'x-apisports-key'
+      req.headers.set('x-apisports-key', _apiKey);
       req.headers.set('User-Agent', 'Mozilla/5.0');
       
       final res = await req.close();
@@ -95,7 +96,6 @@ class _MainScreenState extends State<MainScreen> {
       if (res.statusCode == 200) {
         final decoded = json.decode(body);
         
-        // LIMIT ELLENŐRZÉS: Ha az ingyenes napi limit (100) elfogyott.
         final errors = decoded['errors'];
         if (errors != null && errors is Map && errors.isNotEmpty) {
           setState(() => _errorMessage = "API KORLÁTOZÁS:\n${errors.values.join('\n')}");
@@ -121,6 +121,8 @@ class _MainScreenState extends State<MainScreen> {
             }).toList().cast<Map<String, dynamic>>();
           });
         }
+      } else if (res.statusCode == 403) {
+         setState(() => _errorMessage = "API Hiba (403): A szerver elutasította a kulcsot. Próbálj újat generálni!");
       } else {
         setState(() => _errorMessage = "Szerver Hiba!\nKód: ${res.statusCode}");
       }
