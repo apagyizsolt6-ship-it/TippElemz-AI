@@ -77,11 +77,12 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final client = HttpClient();
       final dateStr = DateTime.now().toString().substring(0, 10);
-      final uri = Uri.parse('https://v3.football.api-sports.io/fixtures?date=$dateStr');
+      
+      // Hozzáadva az időzóna paraméter, hogy biztosan a mai magyar meccseket hozza
+      final uri = Uri.parse('https://v3.football.api-sports.io/fixtures?date=$dateStr&timezone=Europe/Budapest');
       
       final req = await client.getUrl(uri);
       
-      // A KÖTELEZŐ FEJLÉCEK (Ezek nélkül a szerver blokkol)
       req.headers.set('x-rapidapi-key', _apiKey);
       req.headers.set('User-Agent', 'Mozilla/5.0');
       
@@ -103,6 +104,8 @@ class _MainScreenState extends State<MainScreen> {
               "time": m['fixture']?['date'] != null 
                   ? DateFormat('HH:mm').format(DateTime.parse(m['fixture']['date']).toLocal()) 
                   : "--:--",
+              "homeGoals": m['goals']?['home']?.toString() ?? "",
+              "awayGoals": m['goals']?['away']?.toString() ?? "",
             }).toList().cast<Map<String, dynamic>>();
           });
         }
@@ -149,11 +152,16 @@ class _MainScreenState extends State<MainScreen> {
                   itemCount: _matches.length,
                   itemBuilder: (context, index) {
                     final match = _matches[index];
+                    
+                    // Score megjelenítése ha már megy a meccs vagy vége
+                    bool hasScore = match['homeGoals'].toString().isNotEmpty && match['awayGoals'].toString().isNotEmpty;
+                    String scoreText = hasScore ? " ${match['homeGoals']} - ${match['awayGoals']} " : "";
+                    
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       child: ListTile(
                         title: Text("${match['home']} - ${match['away']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text("Kezdés: ${match['time']}"),
+                        subtitle: Text("Kezdés: ${match['time']}$scoreText"),
                         trailing: Text(match['status'], style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
                       ),
                     );
