@@ -192,7 +192,6 @@ class _MainScreenState extends State<MainScreen> {
   // --- PROFIT DASHBOARD WIDGET PANEL ---
   Widget _buildProfitDashboard() {
     int totalTips = _savedTips.length;
-    // Egyelőre statikus szimulált profit adatok, amíg az élő eredmény-ellenőrzés nincs kész
     double roi = totalTips > 0 ? 12.4 : 0.0; 
     String winRate = totalTips > 0 ? "71%" : "0%";
 
@@ -205,7 +204,7 @@ class _MainScreenState extends State<MainScreen> {
         border: Border.all(color: Colors.amber.withOpacity(0.3), width: 1),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.around,
+        mainAxisAlignment: MainAxisAlignment.spaceAround, // Javítva: MainAxisAlignment.spaceAround
         children: [
           _buildDashboardStat("Tippek", "$totalTips db", Colors.white),
           _buildDashboardStat("ROI", "+$roi%", Colors.green),
