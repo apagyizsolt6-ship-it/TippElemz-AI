@@ -98,7 +98,7 @@ class _MainScreenState extends State<MainScreen> {
     await file.writeAsString(json.encode(_savedTips));
   }
 
-  // --- 🧠 FEJLESZTETT DINAMIKUS AI PREDREKCIÓS MOTOR ---
+  // --- 🧠 DINAMIKUS AI POISSON ENGINE VALÓS VAGY SEEDELT ADATOKHOZ ---
   Map<String, dynamic> _calculateRealAiPredictions({
     required Map<String, dynamic> homeStats,
     required Map<String, dynamic> awayStats,
@@ -106,14 +106,15 @@ class _MainScreenState extends State<MainScreen> {
     required String homeName,
     required String awayName,
   }) {
-    // Egyedi seed generálása a csapatnevekből, hogy ha nincs API stat, akkor se legyen minden meccs tök ugyanaz
     int nameSeed = homeName.hashCode ^ awayName.hashCode;
     
-    double defaultHomeAtt = 1.2 + ((nameSeed % 7) / 5.0); // 1.2 - 2.4 között
-    double defaultAwayDef = 1.0 + (((nameSeed >> 2) % 6) / 5.0); // 1.0 - 2.0 között
+    // Ha az API-ból jön adat, azt használjuk, ha nem, akkor a csapatnév alapú egyedi seedet
+    double defaultHomeAtt = 1.2 + ((nameSeed % 7) / 5.0);
+    double defaultAwayDef = 1.0 + (((nameSeed >> 2) % 6) / 5.0);
     double defaultAwayAtt = 1.0 + (((nameSeed >> 4) % 6) / 5.0);
     double defaultHomeDef = 1.1 + (((nameSeed >> 6) % 6) / 5.0);
 
+    // Kinyerjük a gólátlagokat az API válaszból (ha léteznek)
     double homeAtt = double.tryParse(homeStats['goals']?['for']?['average']?['home']?.toString() ?? '') ?? defaultHomeAtt;
     double awayDef = double.tryParse(awayStats['goals']?['against']?['average']?['away']?.toString() ?? '') ?? defaultAwayDef;
     double awayAtt = double.tryParse(awayStats['goals']?['for']?['average']?['away']?.toString() ?? '') ?? defaultAwayAtt;
@@ -125,7 +126,6 @@ class _MainScreenState extends State<MainScreen> {
     int homeGoals = homeExpectedGoals.round().clamp(0, 5);
     int awayGoals = awayExpectedGoals.round().clamp(0, 5);
     
-    // Ne legyen minden döntetlen 1-1, ha az értékek egyeznek
     if (homeGoals == awayGoals && (nameSeed % 3 == 0)) {
       if (homeGoals > 0) homeGoals--;
     }
@@ -280,8 +280,9 @@ class _MainScreenState extends State<MainScreen> {
     double realOdds = 0.0;
 
     try {
+      // ITT FRISSÍTETTEM: season=2025-re, hogy az épp futó bajnokságokat behúzza az API!
       if (m['homeId'] != null && m['leagueId'] != null) {
-        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2026&league=${m['leagueId']}&team=${m['homeId']}'));
+        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2025&league=${m['leagueId']}&team=${m['homeId']}'));
         statReq.headers.add('x-rapidapi-key', _apiKey);
         var statRes = await statReq.close();
         if (statRes.statusCode == 200) {
@@ -289,7 +290,7 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
       if (m['awayId'] != null && m['leagueId'] != null) {
-        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2026&league=${m['leagueId']}&team=${m['awayId']}'));
+        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2025&league=${m['leagueId']}&team=${m['awayId']}'));
         statReq.headers.add('x-rapidapi-key', _apiKey);
         var statRes = await statReq.close();
         if (statRes.statusCode == 200) {
@@ -505,7 +506,7 @@ class _MainScreenState extends State<MainScreen> {
       textColor = Colors.redAccent;
     } else if (status == 'FT') {
       bgColor = Colors.green.withOpacity(0.15);
-      textColor = Colors.greenAccent;
+ greenAccent;
     } else if (isCancelled) {
       bgColor = Colors.orange.withOpacity(0.15);
       textColor = Colors.orangeAccent;
