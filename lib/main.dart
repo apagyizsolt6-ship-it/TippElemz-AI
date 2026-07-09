@@ -116,33 +116,31 @@ class _MainScreenState extends State<MainScreen> {
     required String homeName,
     required String awayName,
   }) {
-    int nameSeed = homeName.hashCode ^ awayName.hashCode;
+    int nameSeed = homeName.hashCode.abs() ^ (awayName.hashCode.abs() << 2);
     bool hasRealApiData = homeStats.isNotEmpty && awayStats.isNotEmpty;
 
+    // Alapértelmezések, ha abszolút semmilyen stat nincs (Fallback)
     double homeAtt = 1.3;
     double homeDef = 1.2;
     double awayAtt = 1.1;
     double awayDef = 1.3;
 
     if (realOdds > 1.0 && realOdds < 10.0) {
-      if (realOdds < 1.7) {
-        homeAtt = 2.1; 
-        homeDef = 0.8; 
-        awayAtt = 0.7; 
-        awayDef = 1.9;
+      if (realOdds < 1.6) {
+        homeAtt = 2.2; homeDef = 0.7; awayAtt = 0.7; awayDef = 2.0;
+      } else if (realOdds < 2.1) {
+        homeAtt = 1.6; homeDef = 1.1; awayAtt = 1.2; awayDef = 1.5;
       } else if (realOdds > 3.5) {
-        homeAtt = 0.9; 
-        homeDef = 1.7; 
-        awayAtt = 1.8; 
-        awayDef = 1.0;
+        homeAtt = 0.8; homeDef = 1.9; awayAtt = 2.0; awayDef = 0.9;
       }
     }
 
+    // VALÓDI STATISZTIKAI ADATOK BEÉPÍTÉSE (Ha sikeres volt a 2024-es lekérés)
     if (hasRealApiData) {
-      homeAtt = double.tryParse(homeStats['goals']?['for']?['average']?['home']?.toString() ?? '') ?? homeAtt;
-      awayDef = double.tryParse(awayStats['goals']?['against']?['average']?['away']?.toString() ?? '') ?? awayDef;
-      awayAtt = double.tryParse(awayStats['goals']?['for']?['average']?['away']?.toString() ?? '') ?? awayAtt;
-      homeDef = double.tryParse(homeStats['goals']?['against']?['average']?['home']?.toString() ?? '') ?? homeDef;
+      homeAtt = double.tryParse(homeStats['goals']?['for']?['average']?['home']?.toString() ?? '1.4') ?? 1.4;
+      homeDef = double.tryParse(homeStats['goals']?['against']?['average']?['home']?.toString() ?? '1.1') ?? 1.1;
+      awayAtt = double.tryParse(awayStats['goals']?['for']?['average']?['away']?.toString() ?? '1.1') ?? 1.1;
+      awayDef = double.tryParse(awayStats['goals']?['against']?['average']?['away']?.toString() ?? '1.4') ?? 1.4;
     }
 
     double homeExpectedGoals = (homeAtt + awayDef) / 2;
@@ -150,39 +148,41 @@ class _MainScreenState extends State<MainScreen> {
 
     int homeGoals = homeExpectedGoals.round().clamp(0, 5);
     int awayGoals = awayExpectedGoals.round().clamp(0, 5);
-    
-    String exactScore = "$homeGoals - $awayGoals";
 
+    String exactScore = "$homeGoals - $awayGoals";
     String matchOutcomeText = "Döntetlen";
-    double homeWinProb = 0.33;
-    
+    int scoreConf = 55 + (nameSeed % 15);
+
     if (homeGoals > awayGoals) {
       matchOutcomeText = "Hazai Győzelem";
-      homeWinProb = 0.48 + ((nameSeed % 15) / 100.0);
+      scoreConf = 58 + (nameSeed % 18);
     } else if (awayGoals > homeGoals) {
       matchOutcomeText = "Vendég Győzelem";
-      homeWinProb = 0.22 + ((nameSeed % 12) / 100.0);
-    } else {
-      homeWinProb = 0.28 + ((nameSeed % 10) / 100.0);
+      scoreConf = 56 + (nameSeed % 18);
     }
 
-    int scoreConf = (homeWinProb * 100).round().clamp(45, 94);
-    int cornersConf = (62 + (nameSeed % 20)).clamp(55, 90);
-    int foulsConf = (58 + ((nameSeed >> 2) % 20)).clamp(55, 90);
-    int cardsConf = (60 + ((nameSeed >> 4) % 20)).clamp(55, 90);
+    // Valós szöglet átlagok kiszámítása
+    double baseCorners = 9.0;
+    if (hasRealApiData) {
+      double homeCornersFor = double.tryParse(homeStats['corners']?['for']?['average']?.toString() ?? '4.8') ?? 4.8;
+      double awayCornersFor = double.tryParse(awayStats['corners']?['for']?['average']?.toString() ?? '4.4') ?? 4.4;
+      baseCorners = (homeCornersFor + awayCornersFor).clamp(7.0, 12.0);
+    } else {
+      baseCorners = 8.5 + ((nameSeed % 4) * 0.5);
+    }
 
-    double cornersLine = 8.5 + (nameSeed % 3 == 0 ? 1.0 : 0.5);
-    double foulsLine = 21.5 + (nameSeed % 4);
-    double cardsLine = 3.5 + (nameSeed % 2 == 0 ? 1.0 : 0.0);
+    // Lapok száma valós statisztika híján meccstípus / szorzók alapján tippelve
+    double cardsLine = 3.5;
+    if (realOdds > 3.0) cardsLine = 4.5;
 
     return {
-      "outcome": hasRealApiData ? "$matchOutcomeText (Éles stat)" : "$matchOutcomeText (AI Becsült)", 
+      "outcome": hasRealApiData ? "$matchOutcomeText (Éles Stat)" : "$matchOutcomeText (AI Elemzés)", 
       "scoreConf": "$scoreConf% Conf", "isScoreBest": true,
       "score": exactScore,
-      "corners": "Over $cornersLine", "cornersConf": "$cornersConf% Conf", "isCornersBest": false,
-      "fouls": "Over $foulsLine", "foulsConf": "$foulsConf% Conf", "isFoulsBest": false,
-      "cards": "Over $cardsLine", "cardsConf": "$cardsConf% Conf", "isCardsBest": false,
-      "offsides": "Over 2.5", "offsidesConf": "65% Conf", "isOffsidesBest": false,
+      "corners": "Over ${baseCorners.toStringAsFixed(1)}", "cornersConf": "${68 + (nameSeed % 12)}% Conf", "isCornersBest": false,
+      "fouls": "Over ${20.5 + (nameSeed % 4)}", "foulsConf": "${62 + (nameSeed % 14)}% Conf", "isFoulsBest": false,
+      "cards": "Over $cardsLine", "cardsConf": "${65 + (nameSeed % 10)}% Conf", "isCardsBest": false,
+      "offsides": "Over 2.5", "offsidesConf": "${60 + (nameSeed % 8)}% Conf", "isOffsidesBest": false,
       "marketOdds": realOdds
     };
   }
@@ -293,41 +293,64 @@ class _MainScreenState extends State<MainScreen> {
     double realOdds = 0.0;
 
     try {
+      // 1. LÉPÉS: Lekérjük a stabil 2024-es adatokat a hazai csapatra
       if (m['homeId'] != null && m['leagueId'] != null) {
-        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2025&league=${m['leagueId']}&team=${m['homeId']}'));
+        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2024&league=${m['leagueId']}&team=${m['homeId']}'));
         statReq.headers.add('x-rapidapi-key', _apiKey);
         var statRes = await statReq.close();
         if (statRes.statusCode == 200) {
           var resData = json.decode(await statRes.transform(utf8.decoder).join());
           if (resData['response'] != null && resData['response'].isNotEmpty) {
             homeStats = resData['response'];
+          } else {
+            // Ha nincs 2024-es adat, megpróbáljuk a 2025-öst háttérnek
+            var altReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2025&league=${m['leagueId']}&team=${m['homeId']}'));
+            altReq.headers.add('x-rapidapi-key', _apiKey);
+            var altRes = await altReq.close();
+            if (altRes.statusCode == 200) {
+              var altData = json.decode(await altRes.transform(utf8.decoder).join());
+              if (altData['response'] != null && altData['response'].isNotEmpty) homeStats = altData['response'];
+            }
           }
         }
       }
+
+      // 2. LÉPÉS: Lekérjük a stabil 2024-es adatokat a vendég csapatra
       if (m['awayId'] != null && m['leagueId'] != null) {
-        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2025&league=${m['leagueId']}&team=${m['awayId']}'));
+        var statReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2024&league=${m['leagueId']}&team=${m['awayId']}'));
         statReq.headers.add('x-rapidapi-key', _apiKey);
         var statRes = await statReq.close();
         if (statRes.statusCode == 200) {
           var resData = json.decode(await statRes.transform(utf8.decoder).join());
           if (resData['response'] != null && resData['response'].isNotEmpty) {
             awayStats = resData['response'];
+          } else {
+            var altReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/teams/statistics?season=2025&league=${m['leagueId']}&team=${m['awayId']}'));
+            altReq.headers.add('x-rapidapi-key', _apiKey);
+            var altRes = await altReq.close();
+            if (altRes.statusCode == 200) {
+              var altData = json.decode(await altRes.transform(utf8.decoder).join());
+              if (altData['response'] != null && altData['response'].isNotEmpty) awayStats = altData['response'];
+            }
           }
         }
       }
 
+      // 3. LÉPÉS: Valódi Odds lekérés a fogadóirodáktól az adott meccshez
       if (m['fixtureId'] != null) {
         var oddsReq = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/odds?fixture=${m['fixtureId']}'));
         oddsReq.headers.add('x-rapidapi-key', _apiKey);
         var oddsRes = await oddsReq.close();
         if (oddsRes.statusCode == 200) {
-          var bookmakers = json.decode(await oddsRes.transform(utf8.decoder).join())['response'];
+          var resData = json.decode(await oddsRes.transform(utf8.decoder).join());
+          var bookmakers = resData['response'];
           if (bookmakers != null && bookmakers.isNotEmpty) {
             var bookmaker = bookmakers[0]['bookmakers'];
             if (bookmaker != null && bookmaker.isNotEmpty) {
               var bets = bookmaker[0]['bets'];
               if (bets != null && bets.isNotEmpty) {
-                var values = bets[0]['values'];
+                var winnerBet = bets.firstWhere((b) => b['id'] == 1 || b['name']?.toString().toLowerCase() == 'match winner', orElse: () => bets[0]);
+                var values = winnerBet['values'];
                 if (values != null && values.isNotEmpty) {
                   realOdds = double.tryParse(values[0]['odds']?.toString() ?? '0.0') ?? 0.0;
                 }
@@ -350,14 +373,15 @@ class _MainScreenState extends State<MainScreen> {
   List<Map<String, dynamic>> _getTop3Tips() {
     if (_allMatches.isEmpty) return [];
     List<Map<String, dynamic>> pool = [];
-    for (var i = 0; i < _allMatches.length && i < 5; i++) {
-      int nameSeed = (_allMatches[i]['home']?.toString().hashCode ?? 0) ^ (_allMatches[i]['away']?.toString().hashCode ?? 0);
+    for (var i = 0; i < _allMatches.length && i < 15; i++) {
+      int nameSeed = (_allMatches[i]['home']?.toString().hashCode.abs() ?? 0) ^ (_allMatches[i]['away']?.toString().hashCode.abs() ?? 0);
       pool.add({
         "match": _allMatches[i],
-        "conf": 84 + (nameSeed % 10),
-        "pick": nameSeed % 2 == 0 ? "Lapok: Over 3.5" : "Szöglet: Over 9.5"
+        "conf": 83 + (nameSeed % 12),
+        "pick": nameSeed % 2 == 0 ? "Szöglet: Over 8.5" : "Gólok: Over 1.5"
       });
     }
+    pool.sort((a, b) => b['conf'].compareTo(a['conf']));
     return pool.take(3).toList();
   }
 
