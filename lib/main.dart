@@ -77,7 +77,7 @@ class _MainScreenState extends State<MainScreen> {
   bool _isLiveOnly = false;
   bool _hideFriendlies = false;
   String _searchQuery = "";
-  final String _apiKey = '8fde2ccd0efdcc2c113d52d84aa33849';
+  final String _apiKey = '56760560446768218fd8a38865651edd';
   double _totalBankroll = 100000.0;
 
   @override
