@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' as ui; // JAVÍTÁS: szétválasztottuk az ui névteret, hogy ne legyen ütközés
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 
@@ -26,6 +25,12 @@ class _MyAppState extends State<MyApp> {
         primaryColor: Colors.amber,
         scaffoldBackgroundColor: const Color(0xFFF5F5F7),
         cardColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          actionsIconTheme: IconThemeData(color: Colors.black),
+          titleTextStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 20),
+        ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.black.withOpacity(0.05),
@@ -37,6 +42,12 @@ class _MyAppState extends State<MyApp> {
         primaryColor: Colors.amber,
         scaffoldBackgroundColor: const Color(0xFF0A1128),
         cardColor: const Color(0xFF101F42),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          actionsIconTheme: IconThemeData(color: Colors.white),
+          titleTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+        ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: const Color(0xFF1E2E5A).withOpacity(0.6),
@@ -142,14 +153,14 @@ class _MainScreenState extends State<MainScreen> {
     
     String exactScore = "$homeGoals - $awayGoals";
 
-    String outcome = "Döntetlen";
+    String matchOutcomeText = "Döntetlen";
     double homeWinProb = 0.33;
     
     if (homeGoals > awayGoals) {
-      outcome = "Hazai Győzelem";
+      matchOutcomeText = "Hazai Győzelem";
       homeWinProb = 0.48 + ((nameSeed % 15) / 100.0);
     } else if (awayGoals > homeGoals) {
-      outcome = "Vendég Győzelem";
+      matchOutcomeText = "Vendég Győzelem";
       homeWinProb = 0.22 + ((nameSeed % 12) / 100.0);
     } else {
       homeWinProb = 0.28 + ((nameSeed % 10) / 100.0);
@@ -165,7 +176,7 @@ class _MainScreenState extends State<MainScreen> {
     double cardsLine = 3.5 + (nameSeed % 2 == 0 ? 1.0 : 0.0);
 
     return {
-      "outcome": hasRealApiData ? "$outcome (Éles stat)" : "$outcome (AI Becsült)", 
+      "outcome": hasRealApiData ? "$matchOutcomeText (Éles stat)" : "$matchOutcomeText (AI Becsült)", 
       "scoreConf": "$scoreConf% Conf", "isScoreBest": true,
       "score": exactScore,
       "corners": "Over $cornersLine", "cornersConf": "$cornersConf% Conf", "isCornersBest": false,
@@ -185,8 +196,8 @@ class _MainScreenState extends State<MainScreen> {
           future: _fetchRealDataAndAnalyze(m),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), // JAVÍTÁS: ui.ImageFilter-t használunk a hiba ellen
+              return Container(
+                color: Colors.black54,
                 child: const Center(child: CircularProgressIndicator(color: Colors.amber)),
               );
             }
@@ -202,14 +213,14 @@ class _MainScreenState extends State<MainScreen> {
 
             double currentOdds = double.tryParse(ai['marketOdds'].toString()) ?? 0.0;
 
-            return BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10), // JAVÍTÁS: ui.ImageFilter-t használunk itt is
+            return Container(
+              color: Colors.black54,
               child: Dialog(
                 backgroundColor: Colors.transparent,
                 child: Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor.withOpacity(0.95),
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(28),
                     border: Border.all(color: Colors.amber.withOpacity(0.25), width: 1.5),
                     boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20, spreadRadius: 5)]
@@ -235,11 +246,11 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ),
                     const Divider(height: 24, thickness: 1),
-                    _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'], ai['scoreConf'], Colors.blueAccent, isBest: ai['isScoreBest']),
-                    _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'], ai['cornersConf'], Colors.greenAccent, isBest: ai['isCornersBest']),
-                    _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", ai['fouls'], ai['foulsConf'], Colors.orangeAccent, isBest: ai['isFoulsBest']),
-                    _buildStatRow(Icons.receipt_long, "Lapok (O/U)", ai['cards'], ai['cardsConf'], Colors.yellowAccent, isBest: ai['isCardsBest']),
-                    _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", ai['offsides'], ai['offsidesConf'], Colors.purpleAccent, isBest: ai['isOffsidesBest']),
+                    _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'].toString(), ai['scoreConf'].toString(), Colors.blueAccent, isBest: ai['isScoreBest'] == true),
+                    _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'].toString(), ai['cornersConf'].toString(), Colors.greenAccent, isBest: ai['isCornersBest'] == true),
+                    _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", ai['fouls'].toString(), ai['foulsConf'].toString(), Colors.orangeAccent, isBest: ai['isFoulsBest'] == true),
+                    _buildStatRow(Icons.receipt_long, "Lapok (O/U)", ai['cards'].toString(), ai['cardsConf'].toString(), Colors.yellowAccent, isBest: ai['isCardsBest'] == true),
+                    _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", ai['offsides'].toString(), ai['offsidesConf'].toString(), Colors.purpleAccent, isBest: ai['isOffsidesBest'] == true),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
@@ -553,15 +564,13 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: 0.5)),
           Text(DateFormat('yyyy.MM.dd').format(DateTime.now()), style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
         ]),
         actions: [
           IconButton(icon: Icon(_hideFriendlies ? Icons.sports_esports : Icons.sports_soccer, color: _hideFriendlies ? Colors.grey : Colors.greenAccent), onPressed: () => setState(() => _hideFriendlies = !_hideFriendlies)),
-          IconButton(icon: Icon(_isLiveOnly ? Icons.live_tv : Icons.tv_off, color: _isLiveOnly ? Colors.redAccent : null), onPressed: () => setState(() => _isLiveOnly = !_isLiveOnly)),
+          IconButton(icon: Icon(_isLiveOnly ? Icons.live_tv : Icons.tv_off, color: _isLiveOnly ? Colors.redAccent : Colors.grey), onPressed: () => setState(() => _isLiveOnly = !_isLiveOnly)),
           IconButton(icon: const Icon(Icons.brightness_6), onPressed: widget.toggleTheme),
         ],
         bottom: PreferredSize(preferredSize: const Size.fromHeight(70), child: Padding(
@@ -602,9 +611,9 @@ class _MainScreenState extends State<MainScreen> {
                           child: InkWell(
                             onTap: () => _analyze(item['match']),
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                              Text("${item['match']['home']} - ${item['match']['away']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis),
+                              Text("${item['match']['home'] ?? ''} - ${item['match']['away'] ?? ''}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis),
                               const SizedBox(height: 6),
-                              Text(item['pick'], style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
+                              Text(item['pick'].toString(), style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
                               const Spacer(),
                               Text("Biztonsági szint: ${item['conf']}%", style: TextStyle(color: Colors.grey[400], fontSize: 10, fontWeight: FontWeight.w500)),
                             ]),
@@ -638,7 +647,7 @@ class _MainScreenState extends State<MainScreen> {
                                 padding: const EdgeInsets.only(top: 6),
                                 child: Text("Kezdés: ${filteredMatches[i]['time']}", style: TextStyle(color: Colors.amber[400], fontSize: 12, fontWeight: FontWeight.w600)),
                               ),
-                              trailing: _buildStatusBadge(filteredMatches[i]['status'], filteredMatches[i]['liveScore']),
+                              trailing: _buildStatusBadge(filteredMatches[i]['status'].toString(), filteredMatches[i]['liveScore'].toString()),
                               onTap: () => _analyze(filteredMatches[i]),
                             ),
                           ),
@@ -657,8 +666,8 @@ class _MainScreenState extends State<MainScreen> {
                                       child: ListTile(
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                                         leading: const CircleAvatar(backgroundColor: Colors.transparent, radius: 16, child: Icon(Icons.analytics_outlined, size: 16, color: Colors.amber)),
-                                        title: Text(activeTips[i]['match'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                        subtitle: Text(activeTips[i]['pick'], style: const TextStyle(color: Colors.amber, fontSize: 12)),
+                                        title: Text(activeTips[i]['match'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        subtitle: Text(activeTips[i]['pick'].toString(), style: const TextStyle(color: Colors.amber, fontSize: 12)),
                                         trailing: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
@@ -693,7 +702,7 @@ class _MainScreenState extends State<MainScreen> {
                                       ),
                                       child: ListTile(
                                         leading: Icon(isWon ? Icons.check_circle : Icons.cancel, color: isWon ? Colors.greenAccent : Colors.redAccent, size: 22),
-                                        title: Text(settledTips[i]['match'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                        title: Text(settledTips[i]['match'].toString(), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                         subtitle: Padding(
                                           padding: const EdgeInsets.only(top: 4),
                                           child: Text("${settledTips[i]['pick']}\nOdds: ${displayOdds.toStringAsFixed(2)}  |  Tét: ${displayStake.toStringAsFixed(0)} Ft", style: TextStyle(fontSize: 11, color: Colors.grey[400], height: 1.3)),
