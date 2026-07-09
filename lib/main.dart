@@ -35,13 +35,15 @@ class _MyAppState extends State<MyApp> {
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         primaryColor: Colors.amber,
-        scaffoldBackgroundColor: const Color(0xFF0F0E13),
-        cardColor: const Color(0xFF18171F),
+        // --- 🔵 ÚJ ÉLÉNK KÉK DIZÁJN ALAPOK ---
+        scaffoldBackgroundColor: const Color(0xFF0A1128), // Mély, élénk kék háttér
+        cardColor: const Color(0xFF101F42),               // Vibrálóbb kék a kártyáknak
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white.withOpacity(0.05),
+          fillColor: const Color(0xFF1E2E5A).withOpacity(0.6), // Kék tónusú keresőmező
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
         ),
+        dividerColor: const Color(0xFF1E2E5A),
       ),
       themeMode: _themeMode,
       home: MainScreen(toggleTheme: toggleTheme),
@@ -173,9 +175,9 @@ class _MainScreenState extends State<MainScreen> {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor.withOpacity(0.92),
+            color: Theme.of(context).cardColor.withOpacity(0.95),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.amber.withOpacity(0.2), width: 1.5),
+            border: Border.all(color: Colors.amber.withOpacity(0.25), width: 1.5),
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 20, spreadRadius: 5)]
           ),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -185,11 +187,11 @@ class _MainScreenState extends State<MainScreen> {
             const SizedBox(height: 8),
             Text("AI Pontos Tipp: ${ai['score']}", style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.w600, fontSize: 13)),
             const Divider(height: 24, thickness: 1),
-            _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'], ai['scoreConf'], Colors.blue, isBest: ai['isScoreBest']),
-            _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'], ai['cornersConf'], Colors.green, isBest: ai['isCornersBest']),
-            _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", ai['fouls'], ai['foulsConf'], Colors.orange, isBest: ai['isFoulsBest']),
-            _buildStatRow(Icons.receipt_long, "Lapok (O/U)", ai['cards'], ai['cardsConf'], Colors.yellow, isBest: ai['isCardsBest']),
-            _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", ai['offsides'], ai['offsidesConf'], Colors.purple, isBest: ai['isOffsidesBest']),
+            _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'], ai['scoreConf'], Colors.blueAccent, isBest: ai['isScoreBest']),
+            _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'], ai['cornersConf'], Colors.greenAccent, isBest: ai['isCornersBest']),
+            _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", ai['fouls'], ai['foulsConf'], Colors.orangeAccent, isBest: ai['isFoulsBest']),
+            _buildStatRow(Icons.receipt_long, "Lapok (O/U)", ai['cards'], ai['cardsConf'], Colors.yellowAccent, isBest: ai['isCardsBest']),
+            _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", ai['offsides'], ai['offsidesConf'], Colors.purpleAccent, isBest: ai['isOffsidesBest']),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -232,7 +234,7 @@ class _MainScreenState extends State<MainScreen> {
       const SizedBox(width: 14),
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-        Text(conf, style: TextStyle(fontSize: 11, color: isBest ? Colors.amber : Colors.grey)),
+        Text(conf, style: TextStyle(fontSize: 11, color: isBest ? Colors.amber : Colors.grey[400])),
       ]),
       const Spacer(),
       Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isBest ? Colors.amber : null))
@@ -276,6 +278,7 @@ class _MainScreenState extends State<MainScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(newStatus == 'won' ? "🎉 Tipp lezárása: NYERT" : "❌ Tipp lezárása: VESZTETT"),
         content: Column(
@@ -287,7 +290,7 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Mégse")),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Mégse", style: TextStyle(color: Colors.grey))),
           ElevatedButton(
             onPressed: () {
               setState(() {
@@ -335,10 +338,10 @@ class _MainScreenState extends State<MainScreen> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [Theme.of(context).cardColor, Theme.of(context).cardColor.withOpacity(0.6)]),
+        gradient: LinearGradient(colors: [Theme.of(context).cardColor, Theme.of(context).cardColor.withOpacity(0.7)]),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.amber.withOpacity(0.2), width: 1.5),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))]
+        border: Border.all(color: Colors.amber.withOpacity(0.25), width: 1.5),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 4))]
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -365,18 +368,18 @@ class _MainScreenState extends State<MainScreen> {
     bool isLive = status == '1H' || status == '2H' || status == 'ET' || status == 'LIVE';
     bool isCancelled = status == 'CANC' || status == 'PST';
     
-    Color bgColor = Colors.grey.withOpacity(0.12);
-    Color textColor = Colors.grey;
+    Color bgColor = Colors.grey.withOpacity(0.15);
+    Color textColor = Colors.grey[400]!;
 
     if (isLive) {
-      bgColor = Colors.red.withOpacity(0.15);
+      bgColor = Colors.red.withOpacity(0.2);
       textColor = Colors.redAccent;
     } else if (status == 'FT') {
-      bgColor = Colors.green.withOpacity(0.12);
-      textColor = Colors.green;
+      bgColor = Colors.green.withOpacity(0.15);
+      textColor = Colors.greenAccent;
     } else if (isCancelled) {
-      bgColor = Colors.orange.withOpacity(0.12);
-      textColor = Colors.orange;
+      bgColor = Colors.orange.withOpacity(0.15);
+      textColor = Colors.orangeAccent;
     }
 
     return Container(
@@ -416,7 +419,7 @@ class _MainScreenState extends State<MainScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: 0.5)),
+          const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: 0.5)),
           Text(DateFormat('yyyy.MM.dd').format(DateTime.now()), style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
         ]),
         actions: [
@@ -441,7 +444,7 @@ class _MainScreenState extends State<MainScreen> {
                 if (_selectedIndex == 0 && _allMatches.isNotEmpty && _searchQuery.isEmpty) ...[
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    child: Align(alignment: Alignment.centerLeft, child: Text("🔥 NAPI TOP 3 AI TIPP", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.amber, letterSpacing: 0.5))),
+                    child: Align(alignment: Alignment.centerLeft, child: Text("🔥 NAPI TOP 3 AI TIPP", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber, letterSpacing: 0.5))),
                   ),
                   SizedBox(
                     height: 110,
@@ -455,9 +458,9 @@ class _MainScreenState extends State<MainScreen> {
                           margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: [Colors.amber.withOpacity(0.22), Colors.amber.withOpacity(0.05)]),
+                            gradient: LinearGradient(colors: [Colors.amber.withOpacity(0.25), Colors.amber.withOpacity(0.05)]),
                             borderRadius: BorderRadius.circular(16), 
-                            border: Border.all(color: Colors.amber.withOpacity(0.35), width: 1.2)
+                            border: Border.all(color: Colors.amber.withOpacity(0.4), width: 1.2)
                           ),
                           child: InkWell(
                             onTap: () => _analyze(item['match']),
@@ -466,7 +469,7 @@ class _MainScreenState extends State<MainScreen> {
                               const SizedBox(height: 6),
                               Text(item['pick'], style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
                               const Spacer(),
-                              Text("Biztonsági szint: ${item['conf']}%", style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.w500)),
+                              Text("Biztonsági szint: ${item['conf']}%", style: TextStyle(color: Colors.grey[400], fontSize: 10, fontWeight: FontWeight.w500)),
                             ]),
                           ),
                         );
@@ -483,9 +486,9 @@ class _MainScreenState extends State<MainScreen> {
                           itemBuilder: (_, i) => Container(
                             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(colors: [Theme.of(context).cardColor, Theme.of(context).cardColor.withOpacity(0.4)]), 
+                              gradient: LinearGradient(colors: [Theme.of(context).cardColor, Theme.of(context).cardColor.withOpacity(0.5)]), 
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.05), width: 1),
+                              border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.2), width: 1),
                             ),
                             child: ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -496,7 +499,7 @@ class _MainScreenState extends State<MainScreen> {
                               title: Text("${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                               subtitle: Padding(
                                 padding: const EdgeInsets.only(top: 6),
-                                child: Text("Kezdés: ${filteredMatches[i]['time']}", style: TextStyle(color: Colors.amber[600], fontSize: 12, fontWeight: FontWeight.w600)),
+                                child: Text("Kezdés: ${filteredMatches[i]['time']}", style: TextStyle(color: Colors.amber[400], fontSize: 12, fontWeight: FontWeight.w600)),
                               ),
                               trailing: _buildStatusBadge(filteredMatches[i]['status'], filteredMatches[i]['liveScore']),
                               onTap: () => _analyze(filteredMatches[i]),
@@ -544,16 +547,16 @@ class _MainScreenState extends State<MainScreen> {
                                     return Container(
                                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
                                       decoration: BoxDecoration(
-                                        color: isWon ? Colors.green.withOpacity(0.03) : Colors.red.withOpacity(0.03),
+                                        color: isWon ? Colors.green.withOpacity(0.05) : Colors.red.withOpacity(0.05),
                                         borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: (isWon ? Colors.green : Colors.red).withOpacity(0.1), width: 1)
+                                        border: Border.all(color: (isWon ? Colors.green : Colors.red).withOpacity(0.15), width: 1)
                                       ),
                                       child: ListTile(
                                         leading: Icon(isWon ? Icons.check_circle : Icons.cancel, color: isWon ? Colors.greenAccent : Colors.redAccent, size: 22),
                                         title: Text(settledTips[i]['match'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                         subtitle: Padding(
                                           padding: const EdgeInsets.only(top: 4),
-                                          child: Text("${settledTips[i]['pick']}\nOdds: ${settledTips[i]['odds']}  |  Tét: ${settledTips[i]['stake']}", style: const TextStyle(fontSize: 11, color: Colors.grey, height: 1.3)),
+                                          child: Text("${settledTips[i]['pick']}\nOdds: ${settledTips[i]['odds']}  |  Tét: ${settledTips[i]['stake']}", style: TextStyle(fontSize: 11, color: Colors.grey[400], height: 1.3)),
                                         ),
                                         trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.grey, size: 18), onPressed: () => setState(() { _savedTips.removeAt(realIndex); _saveTips(); })),
                                       ),
