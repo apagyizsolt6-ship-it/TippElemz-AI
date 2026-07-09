@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart'; // Dátum formázáshoz
+import 'package:intl/intl.dart';
 
 void main() => runApp(const MyApp());
 
@@ -21,8 +21,8 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
+      theme: ThemeData(brightness: Brightness.light),
+      darkTheme: ThemeData(brightness: Brightness.dark),
       themeMode: _themeMode,
       home: MainScreen(toggleTheme: toggleTheme),
     );
@@ -58,7 +58,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<String> _getPath() async {
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/pro_analyzer_v4_final.json';
+    return '${dir.path}/pro_analyzer_v5_ultimate.json';
   }
 
   Future<void> _loadSavedTips() async {
@@ -76,33 +76,26 @@ class _MainScreenState extends State<MainScreen> {
     await file.writeAsString(json.encode(_savedTips));
   }
 
-  // --- OKOSÍTOTT AI SZIMULÁCIÓS MOTOR ---
+  // --- AI SZIMULÁCIÓS MOTOR ---
   Map<String, dynamic> _generateAiPredictions(String home, String away) {
     int seed = home.length + away.length;
-    
-    // Pontos eredmény tipp generálása (pl. 2-1, 1-0, 0-2)
     int homeGoals = seed % 4;
     int awayGoals = (seed * 3) % 3;
     String exactScore = "$homeGoals - $awayGoals";
-    int scoreConf = 55 + (seed % 25); // 55% - 80%
+    int scoreConf = 55 + (seed % 25);
 
-    // Szögletek
     double cornersLine = 8.5 + (seed % 3);
     int cornersConf = 65 + (seed * 3 % 25);
 
-    // Szabálytalanságok
     double foulsLine = 21.5 + (seed % 5);
     int foulsConf = 60 + (seed * 7 % 30);
 
-    // Lapok
     double cardsLine = 3.5 + (seed % 2);
     int cardsConf = 55 + (seed * 2 % 30);
 
-    // Lesek
     double offsidesLine = 1.5 + (seed % 3);
     int offsidesConf = 50 + (seed * 4 % 35);
 
-    // Megkeressük, melyik tipp a legmagasabb konfidenciájú (ez lesz a Best Bet)
     List<int> confidences = [scoreConf, cornersConf, foulsConf, cardsConf, offsidesConf];
     int maxConf = confidences.reduce((curr, next) => curr > next ? curr : next);
 
@@ -112,7 +105,24 @@ class _MainScreenState extends State<MainScreen> {
       "fouls": "Over $foulsLine", "foulsConf": "$foulsConf% Conf", "isFoulsBest": foulsConf == maxConf,
       "cards": "Over $cardsLine", "cardsConf": "$cardsConf% Conf", "isCardsBest": cardsConf == maxConf,
       "offsides": "Over $offsidesLine", "offsidesConf": "$offsidesConf% Conf", "isOffsidesBest": offsidesConf == maxConf,
+      "maxConfValue": maxConf,
+      "bestBetString": scoreConf == maxConf ? "Pontos eredmény: $exactScore" : (cornersConf == maxConf ? "Szöglet: Over $cornersLine" : "Lapok: Over $cardsLine")
     };
+  }
+
+  // --- KIVÁLASZTJA A NAP 3 LEGBIZTOSABB TIPPJÉT ---
+  List<Map<String, dynamic>> _getTop3Tips() {
+    List<Map<String, dynamic>> pool = [];
+    for (var m in _allMatches) {
+      final ai = _generateAiPredictions(m['home'], m['away']);
+      pool.add({
+        "match": m,
+        "conf": ai['maxConfValue'],
+        "pick": ai['bestBetString']
+      });
+    }
+    pool.sort((a, b) => b['conf'].compareTo(a['conf']));
+    return pool.take(3).toList();
   }
 
   void _analyze(Map<String, dynamic> m) {
@@ -142,7 +152,9 @@ class _MainScreenState extends State<MainScreen> {
                 setState(() => _savedTips.add({
                   "match": "${m['home']} - ${m['away']}", 
                   "pick": "Pontos eredmény: ${ai['score']}",
-                  "status": "pending" // Kezdeti státusz: függőben
+                  "status": "pending",
+                  "odds": 2.0,
+                  "stake": 10.0
                 }));
                 _saveTips(); 
                 Navigator.pop(context);
@@ -180,30 +192,88 @@ class _MainScreenState extends State<MainScreen> {
       var res = await req.close();
       if (res.statusCode == 200) {
         var data = json.decode(await res.transform(utf8.decoder).join())['response'];
-        setState(() => _allMatches = List<Map<String, dynamic>>.from(data.map((m) => {
-          "home": m['teams']['home']['name'],
-          "away": m['teams']['away']['name'],
-          "logo": m['league']['logo'],
-          "status": m['fixture']['status']['short'],
-          "league": m['league']['name'],
-          "time": m['fixture']['date'] != null ? DateFormat('HH:mm').format(DateTime.parse(m['fixture']['date'])) : "--:--",
+        setState(() => _allMatches = List<Map<String, dynamic>>.from(data.map((m) {
+          // ÉLŐ MECCSEK AKTÁLIS ÁLLÁSÁNAK LEKÉRÉSE (2. FŐ FUNKCIÓ)
+          String homeGoals = m['goals']['home'] != null ? m['goals']['home'].toString() : "";
+          String awayGoals = m['goals']['away'] != null ? m['goals']['away'].toString() : "";
+          String currentScore = (homeGoals.isNotEmpty && awayGoals.isNotEmpty) ? " | $homeGoals-$awayGoals" : "";
+
+          return {
+            "home": m['teams']['home']['name'],
+            "away": m['teams']['away']['name'],
+            "logo": m['league']['logo'],
+            "status": m['fixture']['status']['short'],
+            "league": m['league']['name'],
+            "time": m['fixture']['date'] != null ? DateFormat('HH:mm').format(DateTime.parse(m['fixture']['date'])) : "--:--",
+            "liveScore": currentScore
+          };
         })));
       }
     } catch (_) {}
     setState(() => _isLoading = false);
   }
 
-  // --- MATEMATIKAILAG VALÓDI STATISZTIKA SZÁMÍTÁS ---
+  // --- ODDS ÉS TÉT BEKÉRŐ MODAL WINDOW (1. FŐ FUNKCIÓ) ---
+  void _settleTipDialog(int index, String newStatus) {
+    final oddsController = TextEditingController(text: "2.00");
+    final stakeController = TextEditingController(text: "10");
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(newStatus == 'won' ? "Tipp lezárása: NYERT" : "Tipp lezárása: VESZTETT"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: oddsController, decoration: const InputDecoration(labelText: "Valódi Szorzó (Odds)"), keyboardType: const TextInputType.numberWithOptions(decimal: true)),
+            TextField(controller: stakeController, decoration: const InputDecoration(labelText: "Tét (Unit vagy Ft)"), keyboardType: TextInputType.number),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Mégse")),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _savedTips[index]['status'] = newStatus;
+                _savedTips[index]['odds'] = double.tryParse(oddsController.text) ?? 2.0;
+                _savedTips[index]['stake'] = double.tryParse(stakeController.text) ?? 10.0;
+                _saveTips();
+              });
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
+            child: const Text("Mentés és elszámolás"),
+          )
+        ],
+      ),
+    );
+  }
+
+  // --- HAJSZÁLPONTOS PRO PROFIT DASHBOARD SZÁMÍTÁS ---
   Widget _buildProfitDashboard() {
     int totalTips = _savedTips.length;
     int wonTips = _savedTips.where((t) => t['status'] == 'won').length;
     int lostTips = _savedTips.where((t) => t['status'] == 'lost').length;
 
-    double totalProfit = (wonTips * 1.0) - (lostTips * 1.0);
-    
+    double totalStake = 0;
+    double netProfit = 0;
+
+    for (var t in _savedTips) {
+      if (t['status'] == 'won' || t['status'] == 'lost') {
+        double stake = (t['stake'] ?? 10.0).toDouble();
+        double odds = (t['odds'] ?? 2.0).toDouble();
+        totalStake += stake;
+        if (t['status'] == 'won') {
+          netProfit += (stake * odds) - stake;
+        } else {
+          netProfit -= stake;
+        }
+      }
+    }
+
     int ratedTips = wonTips + lostTips;
     String winRate = ratedTips > 0 ? "${((wonTips / ratedTips) * 100).toStringAsFixed(0)}%" : "0%";
-    String roi = ratedTips > 0 ? "${((totalProfit / ratedTips) * 100).toStringAsFixed(1)}%" : "0.0%";
+    String roi = totalStake > 0 ? "${((netProfit / totalStake) * 100).toStringAsFixed(1)}%" : "0.0%";
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -216,8 +286,8 @@ class _MainScreenState extends State<MainScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildDashboardStat("Tippek", "$totalTips db", Colors.white),
-          _buildDashboardStat("ROI", totalProfit >= 0 ? "+$roi" : roi, totalProfit >= 0 ? Colors.green : Colors.red),
+          _buildDashboardStat("Össz Tipp", "$totalTips db", Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white),
+          _buildDashboardStat("Valódi ROI", netProfit >= 0 ? "+$roi" : roi, netProfit >= 0 ? Colors.green : Colors.red),
           _buildDashboardStat("Win Rate", winRate, Colors.amber),
         ],
       ),
@@ -237,31 +307,25 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredMatches = _allMatches.where((m) {
-      // 1. Kereső szűrő
       bool matchesSearch = m['home']?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? true;
-      
-      // 2. Élő meccs szűrő
       bool matchesLive = !_isLiveOnly || m['status'] == '1H' || m['status'] == '2H' || m['status'] == 'ET' || m['status'] == 'LIVE';
       
-      // 3. Barátságos meccsek szűrése (GOLYÓÁLLÓ JAVÍTÁS: "friendlies" és "friend" szótövekre is szűr)
       String leagueName = m['league']?.toString().toLowerCase() ?? "";
       String homeName = m['home']?.toString().toLowerCase() ?? "";
+      String awayName = m['away']?.toString().toLowerCase() ?? "";
       
-      bool isFriendly = leagueName.contains('friendly') || 
-                       leagueName.contains('friendlies') || 
-                       leagueName.contains('friend') || 
-                       leagueName.contains('barátságos') ||
-                       homeName.contains('friendly') ||
-                       homeName.contains('friendlies');
-                       
+      bool isFriendly = leagueName.contains('friendly') || leagueName.contains('friendlies') || leagueName.contains('friend') || leagueName.contains('barátságos') || homeName.contains('friendly') || homeName.contains('friendlies') || awayName.contains('friendly');
       bool matchesFriendly = !_hideFriendlies || !isFriendly;
 
-      // 4. Már lejátszott, befejezett meccsek elrejtése
       bool isFinished = m['status'] == 'FT' || m['status'] == 'AET' || m['status'] == 'PEN' || m['status'] == 'PST';
       bool matchesNotFinished = !isFinished;
 
       return matchesSearch && matchesLive && matchesFriendly && matchesNotFinished;
     }).toList();
+
+    // 4. FUNKCIÓ: TIPPEK SZÉTVÁLASZTÁSA AKTÍV ÉS LEZÁRT RÉSZRE
+    final activeTips = _savedTips.where((t) => t['status'] == 'pending').toList();
+    final settledTips = _savedTips.where((t) => t['status'] == 'won' || t['status'] == 'lost').toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -270,14 +334,8 @@ class _MainScreenState extends State<MainScreen> {
           Text(DateFormat('yyyy.MM.dd').format(DateTime.now()), style: const TextStyle(fontSize: 12, color: Colors.grey)),
         ]),
         actions: [
-          IconButton(
-            icon: Icon(_hideFriendlies ? Icons.sports_esports : Icons.sports_soccer, color: _hideFriendlies ? Colors.grey : Colors.green), 
-            onPressed: () => setState(() => _hideFriendlies = !_hideFriendlies)
-          ),
-          IconButton(
-            icon: Icon(_isLiveOnly ? Icons.live_tv : Icons.tv_off, color: _isLiveOnly ? Colors.red : null), 
-            onPressed: () => setState(() => _isLiveOnly = !_isLiveOnly)
-          ),
+          IconButton(icon: Icon(_hideFriendlies ? Icons.sports_esports : Icons.sports_soccer, color: _hideFriendlies ? Colors.grey : Colors.green), onPressed: () => setState(() => _hideFriendlies = !_hideFriendlies)),
+          IconButton(icon: Icon(_isLiveOnly ? Icons.live_tv : Icons.tv_off, color: _isLiveOnly ? Colors.red : null), onPressed: () => setState(() => _isLiveOnly = !_isLiveOnly)),
           IconButton(icon: const Icon(Icons.brightness_6), onPressed: widget.toggleTheme),
         ],
         bottom: PreferredSize(preferredSize: const Size.fromHeight(60), child: Padding(
@@ -291,60 +349,110 @@ class _MainScreenState extends State<MainScreen> {
               children: [
                 if (_selectedIndex == 1) _buildProfitDashboard(),
                 
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _selectedIndex == 0 ? filteredMatches.length : _savedTips.length,
-                    itemBuilder: (_, i) => Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: [Theme.of(context).cardColor, Colors.transparent]),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: ListTile(
-                        leading: _selectedIndex == 0 
-                            ? Image.network(filteredMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)) 
-                            : Icon(
-                                _savedTips[i]['status'] == 'won' ? Icons.check_circle : (_savedTips[i]['status'] == 'lost' ? Icons.cancel : Icons.history),
-                                color: _savedTips[i]['status'] == 'won' ? Colors.green : (_savedTips[i]['status'] == 'lost' ? Colors.red : Colors.amber),
-                              ),
-                        title: Text(_selectedIndex == 0 ? "${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}" : _savedTips[i]['match']),
-                        subtitle: _selectedIndex == 0 
-                            ? Text("Kezdés: ${filteredMatches[i]['time']} (${filteredMatches[i]['status']})", style: TextStyle(color: Colors.amber[700])) 
-                            : Text(_savedTips[i]['pick'], style: const TextStyle(color: Colors.amber)),
-                        onTap: () => _selectedIndex == 0 ? _analyze(filteredMatches[i]) : null,
-                        trailing: _selectedIndex == 1 
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (_savedTips[i]['status'] == 'pending') 
-                                    IconButton(
-                                      icon: const Icon(Icons.check, color: Colors.green),
-                                      onPressed: () => setState(() {
-                                        _savedTips[i]['status'] = 'won';
-                                        _saveTips();
-                                      }),
-                                    ),
-                                  if (_savedTips[i]['status'] == 'pending') 
-                                    IconButton(
-                                      icon: const Icon(Icons.close, color: Colors.red),
-                                      onPressed: () => setState(() {
-                                        _savedTips[i]['status'] = 'lost';
-                                        _saveTips();
-                                      }),
-                                    ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.grey), 
-                                    onPressed: () => setState(() {
-                                      _savedTips.removeAt(i);
-                                      _saveTips();
-                                    })
-                                  ),
-                                ],
-                              ) 
-                            : null,
-                      ),
+                // 3. FUNKCIÓ: NAPI TOP 3 AI TIPP PANELA MECCSEK FÜLÖN
+                if (_selectedIndex == 0 && _allMatches.isNotEmpty && _searchQuery.isEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Align(alignment: Alignment.centerLeft, child: Text("🔥 NAPI TOP 3 AI TIPP", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.amber))),
+                  ),
+                  SizedBox(
+                    height: 100,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _getTop3Tips().length,
+                      itemBuilder: (_, idx) {
+                        final item = _getTop3Tips()[idx];
+                        return Container(
+                          width: 250,
+                          margin: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: Colors.amber.withOpacity(0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.withOpacity(0.4))),
+                          child: InkWell(
+                            onTap: () => _analyze(item['match']),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+                              Text("${item['match']['home']} - ${item['match']['away']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis),
+                              const SizedBox(height: 4),
+                              Text(item['pick'], style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold)),
+                              Text("Konfidencia: ${item['conf']}%", style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                            ]),
+                          ),
+                        );
+                      },
                     ),
                   ),
+                  const Divider(),
+                ],
+
+                Expanded(
+                  child: _selectedIndex == 0
+                      ? ListView.builder(
+                          itemCount: filteredMatches.length,
+                          itemBuilder: (_, i) => Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(gradient: LinearGradient(colors: [Theme.of(context).cardColor, Colors.transparent]), borderRadius: BorderRadius.circular(15)),
+                            child: ListTile(
+                              leading: Image.network(filteredMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)),
+                              title: Text("${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}"),
+                              subtitle: Text("Kezdés: ${filteredMatches[i]['time']} (${filteredMatches[i]['status']})${filteredMatches[i]['liveScore']}", style: TextStyle(color: Colors.amber[700])),
+                              onTap: () => _analyze(filteredMatches[i]),
+                            ),
+                          ),
+                        )
+                      : CustomScrollView(
+                          slivers: [
+                            // --- AKTÍV (FÜGGŐBEN LÉVŐ) TIPPEK RÉSZ ---
+                            if (activeTips.isNotEmpty) ...[
+                              const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(16), child: Text("⏳ Aktív Tippek", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.amber)))),
+                              SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (_, i) {
+                                    int realIndex = _savedTips.indexOf(activeTips[i]);
+                                    return Card(
+                                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                      child: ListTile(
+                                        leading: const Icon(Icons.history, color: Colors.amber),
+                                        title: Text(activeTips[i]['match']),
+                                        subtitle: Text(activeTips[i]['pick']),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(icon: const Icon(Icons.check, color: Colors.green), onPressed: () => _settleTipDialog(realIndex, 'won')),
+                                            IconButton(icon: const Icon(Icons.close, color: Colors.red), onPressed: () => _settleTipDialog(realIndex, 'lost')),
+                                            IconButton(icon: const Icon(Icons.delete, color: Colors.grey), onPressed: () => setState(() { _savedTips.removeAt(realIndex); _saveTips(); })),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  childCount: activeTips.length,
+                                ),
+                              ),
+                            ],
+                            // --- LEZÁRT TÖRTÉNET RÉSZ ---
+                            if (settledTips.isNotEmpty) ...[
+                              const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(16), child: Text("✅ Lezárt Történet", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.grey)))),
+                              SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (_, i) {
+                                    int realIndex = _savedTips.indexOf(settledTips[i]);
+                                    bool isWon = settledTips[i]['status'] == 'won';
+                                    return Card(
+                                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                      color: isWon ? Colors.green.withOpacity(0.05) : Colors.red.withOpacity(0.05),
+                                      child: ListTile(
+                                        leading: Icon(isWon ? Icons.check_circle : Icons.cancel, color: isWon ? Colors.green : Colors.red),
+                                        title: Text(settledTips[i]['match'], style: const TextStyle(fontSize: 13)),
+                                        subtitle: Text("${settledTips[i]['pick']}\nOdds: ${settledTips[i]['odds']} | Tét: ${settledTips[i]['stake']}", style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                        trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.grey), onPressed: () => setState(() { _savedTips.removeAt(realIndex); _saveTips(); })),
+                                      ),
+                                    );
+                                  },
+                                  childCount: settledTips.length,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                 ),
               ],
             ),
