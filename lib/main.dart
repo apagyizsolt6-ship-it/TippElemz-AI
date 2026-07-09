@@ -60,7 +60,9 @@ class _MainScreenState extends State<MainScreen> {
   List<Map<String, dynamic>> _matches = [];
   bool _isLoading = true;
   String _errorMessage = "";
-  final String _apiKey = '56760560446768218fd8a38865651edd';
+  
+  // A fotón szereplő API kulcsod
+  final String _apiKey = 'd73003bb74642f696d0c0b1785330e4f';
   
   late List<DateTime> _nextDays;
   int _selectedDateIndex = 0;
@@ -86,7 +88,7 @@ class _MainScreenState extends State<MainScreen> {
       
       final req = await client.getUrl(uri);
       
-      // FIGYELEM: Itt van a változás! 'x-rapidapi-key' helyett 'x-apisports-key'
+      // A KULCSFONTOSSÁGÚ JAVÍTÁS: 'x-apisports-key' a közvetlen regisztrációhoz
       req.headers.set('x-apisports-key', _apiKey);
       req.headers.set('User-Agent', 'Mozilla/5.0');
       
@@ -98,7 +100,7 @@ class _MainScreenState extends State<MainScreen> {
         
         final errors = decoded['errors'];
         if (errors != null && errors is Map && errors.isNotEmpty) {
-          setState(() => _errorMessage = "API KORLÁTOZÁS:\n${errors.values.join('\n')}");
+          setState(() => _errorMessage = "API KORLÁTOZÁS VAGY HIBA:\n${errors.values.join('\n')}");
           return;
         }
 
@@ -122,7 +124,7 @@ class _MainScreenState extends State<MainScreen> {
           });
         }
       } else if (res.statusCode == 403) {
-         setState(() => _errorMessage = "API Hiba (403): A szerver elutasította a kulcsot. Próbálj újat generálni!");
+         setState(() => _errorMessage = "API Hiba (403): A szerver elutasította a kulcsot.\nGyőződj meg róla, hogy a fiókod aktív-e.");
       } else {
         setState(() => _errorMessage = "Szerver Hiba!\nKód: ${res.statusCode}");
       }
