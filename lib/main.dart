@@ -76,7 +76,45 @@ class _MainScreenState extends State<MainScreen> {
     await file.writeAsString(json.encode(_savedTips));
   }
 
+  // --- RENDKÍVÜL EGYSZERŰ AI SZIMULÁCIÓS MOTOR ---
+  // A csapatnevek karaktereiből generál fix, de meccsenként eltérő adatokat
+  Map<String, dynamic> _generateAiPredictions(String home, String away) {
+    int seed = home.length + away.length;
+    
+    // Kimenetek variálása
+    List<String> outcomes = ["Hazai Győzelem", "Vendég Győzelem", "Döntetlen"];
+    String outcome = outcomes[seed % outcomes.length];
+    int outcomeConf = 60 + (seed % 25); // 60% - 85%
+
+    // Szögletek (pl. 8.5, 9.5, 10.5)
+    double cornersLine = 8.5 + (seed % 3);
+    int cornersConf = 65 + (seed * 3 % 25);
+
+    // Szabálytalanságok (pl. 21.5 - 25.5)
+    double foulsLine = 21.5 + (seed % 5);
+    int foulsConf = 60 + (seed * 7 % 30);
+
+    // Lapok (pl. 3.5, 4.5)
+    double cardsLine = 3.5 + (seed % 2);
+    int cardsConf = 55 + (seed * 2 % 30);
+
+    // Lesek (pl. 2.5, 3.5)
+    double offsidesLine = 1.5 + (seed % 3);
+    int offsidesConf = 50 + (seed * 4 % 35);
+
+    return {
+      "outcome": outcome, "outcomeConf": "$outcomeConf% Conf",
+      "corners": "Over $cornersLine", "cornersConf": "$cornersConf% Conf",
+      "fouls": "Over $foulsLine", "foulsConf": "$foulsConf% Conf",
+      "cards": "Over $cardsLine", "cardsConf": "$cardsConf% Conf",
+      "offsides": "Over $offsidesLine", "offsidesConf": "$offsidesConf% Conf",
+    };
+  }
+
   void _analyze(Map<String, dynamic> m) {
+    // Generáljuk le a dinamikus AI tippeket az aktuális meccshez
+    final ai = _generateAiPredictions(m['home'], m['away']);
+
     showDialog(context: context, builder: (_) => BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
       child: Dialog(
@@ -90,16 +128,20 @@ class _MainScreenState extends State<MainScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text("${m['home']} vs ${m['away']}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber)),
             const SizedBox(height: 15),
-            _buildStatRow(Icons.sports_soccer, "Várható kimenetel", "Hazai Győzelem", "78% Conf", Colors.blue),
-            _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", "Over 9.5", "85% Conf", Colors.green, isBest: true),
-            _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", "Over 24.5", "68% Conf", Colors.orange),
-            _buildStatRow(Icons.receipt_long, "Lapok (O/U)", "Over 3.5", "65% Conf", Colors.yellow),
-            _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", "Over 2.5", "60% Conf", Colors.purple),
+            _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'], ai['outcomeConf'], Colors.blue),
+            _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'], ai['cornersConf'], Colors.green, isBest: true),
+            _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", ai['fouls'], ai['foulsConf'], Colors.orange),
+            _buildStatRow(Icons.receipt_long, "Lapok (O/U)", ai['cards'], ai['cardsConf'], Colors.yellow),
+            _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", ai['offsides'], ai['offsidesConf'], Colors.purple),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
-                setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": "Hazai Győzelem"}));
-                _saveTips(); Navigator.pop(context);
+                setState(() => _savedTips.add({
+                  "match": "${m['home']} - ${m['away']}", 
+                  "pick": ai['outcome']
+                }));
+                _saveTips(); 
+                Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black),
               child: const Text("Tipp mentése"),
@@ -147,6 +189,42 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _isLoading = false);
   }
 
+  // --- PROFIT DASHBOARD WIDGET PANEL ---
+  Widget _buildProfitDashboard() {
+    int totalTips = _savedTips.length;
+    // Egyelőre statikus szimulált profit adatok, amíg az élő eredmény-ellenőrzés nincs kész
+    double roi = totalTips > 0 ? 12.4 : 0.0; 
+    String winRate = totalTips > 0 ? "71%" : "0%";
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.amber.withOpacity(0.3), width: 1),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.around,
+        children: [
+          _buildDashboardStat("Tippek", "$totalTips db", Colors.white),
+          _buildDashboardStat("ROI", "+$roi%", Colors.green),
+          _buildDashboardStat("Win Rate", winRate, Colors.amber),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardStat(String label, String value, Color valueColor) {
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: valueColor)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredMatches = _allMatches.where((m) => 
@@ -171,23 +249,44 @@ class _MainScreenState extends State<MainScreen> {
           child: TextField(decoration: const InputDecoration(hintText: "Csapat keresése...", prefixIcon: Icon(Icons.search)), onChanged: (v) => setState(() => _searchQuery = v)),
         )),
       ),
-      body: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
-        itemCount: _selectedIndex == 0 ? filteredMatches.length : _savedTips.length,
-        itemBuilder: (_, i) => Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [Theme.of(context).cardColor, Colors.transparent]),
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: ListTile(
-            leading: _selectedIndex == 0 ? Image.network(filteredMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)) : const Icon(Icons.history),
-            title: Text(_selectedIndex == 0 ? "${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}" : _savedTips[i]['match']),
-            subtitle: _selectedIndex == 0 ? Text("Kezdés: ${filteredMatches[i]['time']}", style: TextStyle(color: Colors.amber[700])) : Text(_savedTips[i]['pick'], style: const TextStyle(color: Colors.amber)),
-            onTap: () => _selectedIndex == 0 ? _analyze(filteredMatches[i]) : null,
-            trailing: _selectedIndex == 1 ? IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => setState(() => _savedTips.removeAt(i))) : null,
-          ),
-        ),
-      ),
+      body: _isLoading 
+          ? const Center(child: CircularProgressIndicator()) 
+          : Column(
+              children: [
+                // Ha a Profit fülön vagyunk, jelenjen meg felül a Dashboard panel
+                if (_selectedIndex == 1) _buildProfitDashboard(),
+                
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _selectedIndex == 0 ? filteredMatches.length : _savedTips.length,
+                    itemBuilder: (_, i) => Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [Theme.of(context).cardColor, Colors.transparent]),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                        leading: _selectedIndex == 0 
+                            ? Image.network(filteredMatches[i]['logo'] ?? "", width: 40, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer)) 
+                            : const Icon(Icons.history, color: Colors.amber),
+                        title: Text(_selectedIndex == 0 ? "${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}" : _savedTips[i]['match']),
+                        subtitle: _selectedIndex == 0 
+                            ? Text("Kezdés: ${filteredMatches[i]['time']}", style: TextStyle(color: Colors.amber[700])) 
+                            : Text(_savedTips[i]['pick'], style: const TextStyle(color: Colors.amber)),
+                        onTap: () => _selectedIndex == 0 ? _analyze(filteredMatches[i]) : null,
+                        trailing: _selectedIndex == 1 ? IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red), 
+                          onPressed: () => setState(() {
+                            _savedTips.removeAt(i);
+                            _saveTips(); // Törlés után azonnal mentünk a JSON fájlba is!
+                          })
+                        ) : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (i) => setState(() => _selectedIndex = i),
