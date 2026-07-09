@@ -62,14 +62,12 @@ class _MainScreenState extends State<MainScreen> {
   String _errorMessage = "";
   final String _apiKey = '56760560446768218fd8a38865651edd';
   
-  // Dátumválasztó változói
   late List<DateTime> _nextDays;
   int _selectedDateIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    // Generáljuk le a mai napot és a következő 5 napot (összesen 6 nap)
     _nextDays = List.generate(6, (index) => DateTime.now().add(Duration(days: index)));
     _loadMatches();
   }
@@ -83,10 +81,8 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final client = HttpClient();
       
-      // A kiválasztott dátum lekérése formázva (YYYY-MM-DD)
+      // A valódi, pontos dátum lekérése!
       final dateStr = _nextDays[_selectedDateIndex].toString().substring(0, 10);
-      
-      // Időzóna hozzáadva a pontos adatokért
       final uri = Uri.parse('https://v3.football.api-sports.io/fixtures?date=$dateStr&timezone=Europe/Budapest');
       
       final req = await client.getUrl(uri);
@@ -98,10 +94,18 @@ class _MainScreenState extends State<MainScreen> {
       
       if (res.statusCode == 200) {
         final decoded = json.decode(body);
+        
+        // LIMIT ELLENŐRZÉS: Ha az ingyenes napi limit (100) elfogyott.
+        final errors = decoded['errors'];
+        if (errors != null && errors is Map && errors.isNotEmpty) {
+          setState(() => _errorMessage = "API KORLÁTOZÁS:\n${errors.values.join('\n')}");
+          return;
+        }
+
         final List<dynamic> data = decoded['response'] ?? [];
         
         if (data.isEmpty) {
-          setState(() => _errorMessage = "Erre a napra ($dateStr) nincs meccs kiírva.");
+          setState(() => _errorMessage = "Erre a napra ($dateStr) nincs meccs az adatbázisban.");
         } else {
           setState(() {
             _matches = data.map((m) => {
@@ -118,7 +122,7 @@ class _MainScreenState extends State<MainScreen> {
           });
         }
       } else {
-        setState(() => _errorMessage = "API Hiba!\nKód: ${res.statusCode}");
+        setState(() => _errorMessage = "Szerver Hiba!\nKód: ${res.statusCode}");
       }
     } catch (e) {
       setState(() => _errorMessage = "Hálózati Hiba Történt!\n$e");
@@ -145,7 +149,6 @@ class _MainScreenState extends State<MainScreen> {
       ),
       body: Column(
         children: [
-          // Vízszintes dátumválasztó (Flashscore stílusban)
           Container(
             height: 65,
             margin: const EdgeInsets.symmetric(vertical: 8),
@@ -156,9 +159,7 @@ class _MainScreenState extends State<MainScreen> {
                 final date = _nextDays[index];
                 final isSelected = index == _selectedDateIndex;
                 
-                // Formázás (pl. "07. 10.")
                 final displayDate = DateFormat('MM. dd.').format(date);
-                // Nap neve rövidítve
                 final dayName = DateFormat('E').format(date); 
                 
                 return GestureDetector(
@@ -166,7 +167,7 @@ class _MainScreenState extends State<MainScreen> {
                     setState(() {
                       _selectedDateIndex = index;
                     });
-                    _loadMatches(); // Betöltjük a kiválasztott nap meccseit
+                    _loadMatches();
                   },
                   child: Container(
                     width: 75,
@@ -204,7 +205,6 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
           
-          // Meccsek listája
           Expanded(
             child: _isLoading 
                 ? const Center(child: CircularProgressIndicator(color: Colors.amber))
