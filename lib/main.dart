@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
-import 'dart:math';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 
@@ -99,36 +98,29 @@ class _MainScreenState extends State<MainScreen> {
 
   // --- 🧠 SÚLYOZOTT AI SZIMULÁCIÓS MOTOR (POISSON-ELOSZLÁS LOGIKA) ---
   Map<String, dynamic> _generateAiPredictions(String home, String away) {
-    // Generálunk egy stabil belső értéket a csapatnevek karaktereiből
     int homeSeed = home.runes.fold(0, (prev, element) => prev + element);
     int awaySeed = away.runes.fold(0, (prev, element) => prev + element);
 
-    // Csapat profilok szimulálása: Támadó erő (Att) és Védelmi erő (Def) 0.5 és 2.5 között
     double homeAtt = 0.5 + ((homeSeed % 20) / 10.0);
     double homeDef = 0.5 + ((homeSeed % 15) / 10.0);
     double awayAtt = 0.5 + ((awaySeed % 20) / 10.0);
     double awayDef = 0.5 + ((awaySeed % 15) / 10.0);
 
-    // Várható gólok kiszámítása (Támadóerő vs ellenfél védelme)
     double homeExpectedGoals = (homeAtt / awayDef) * 1.2;
     double awayExpectedGoals = (awayAtt / homeDef) * 1.0;
 
-    // Kerekített végeredmény a legvalószínűbb értékekre
     int homeGoals = homeExpectedGoals.round();
     int awayGoals = awayExpectedGoals.round();
     
-    // Biztonsági korlát, hogy ne legyenek irreális eredmények
     if (homeGoals > 5) homeGoals = 5;
     if (awayGoals > 5) awayGoals = 5;
 
     String exactScore = "$homeGoals - $awayGoals";
 
-    // Kimenetel meghatározása
     String outcome = "Döntetlen";
     if (homeGoals > awayGoals) outcome = "Hazai Győzelem";
     if (awayGoals > homeGoals) outcome = "Vendég Győzelem";
 
-    // Konfidencia szintek súlyozása a csapatok erejének különbsége alapján
     double diff = (homeExpectedGoals - awayExpectedGoals).abs();
     int scoreConf = (60 + (diff * 15)).clamp(50, 92).toInt();
     int cornersConf = (65 + ((homeSeed + awaySeed) % 20)).clamp(55, 95).toInt();
@@ -136,7 +128,6 @@ class _MainScreenState extends State<MainScreen> {
     int cardsConf = (62 + ((awaySeed * 3) % 20)).clamp(55, 92).toInt();
     int offsidesConf = (50 + (homeSeed % 35)).clamp(50, 88).toInt();
 
-    // Szögletek, lapok, szabálytalanságok kiszámítása a támadóerők összege alapján
     double totalAtt = homeAtt + awayAtt;
     double cornersLine = (6.5 + (totalAtt * 1.5)).roundToDouble() - 0.5;
     double foulsLine = (16.5 + ((homeDef + awayDef) * 2.5)).roundToDouble() - 0.5;
@@ -370,7 +361,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // --- DESIGN BADGE GENERÁTOR A STÁTUSZOKHOZ ---
   Widget _buildStatusBadge(String status, String liveScore) {
     bool isLive = status == '1H' || status == '2H' || status == 'ET' || status == 'LIVE';
     bool isCancelled = status == 'CANC' || status == 'PST';
@@ -426,7 +416,7 @@ class _MainScreenState extends State<MainScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.black, fontSize: 20, letterSpacing: 0.5)),
+          const Text("AI PRO ANALYZER", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: 0.5)),
           Text(DateFormat('yyyy.MM.dd').format(DateTime.now()), style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
         ]),
         actions: [
@@ -451,7 +441,7 @@ class _MainScreenState extends State<MainScreen> {
                 if (_selectedIndex == 0 && _allMatches.isNotEmpty && _searchQuery.isEmpty) ...[
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    child: Align(alignment: Alignment.centerLeft, child: Text("🔥 NAPI TOP 3 AI TIPP", style: TextStyle(fontWeight: FontWeight.black, fontSize: 13, color: Colors.amber, letterSpacing: 0.5))),
+                    child: Align(alignment: Alignment.centerLeft, child: Text("🔥 NAPI TOP 3 AI TIPP", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.amber, letterSpacing: 0.5))),
                   ),
                   SizedBox(
                     height: 110,
@@ -503,9 +493,9 @@ class _MainScreenState extends State<MainScreen> {
                                 borderRadius: BorderRadius.circular(8),
                                 child: Image.network(filteredMatches[i]['logo'] ?? "", width: 36, height: 36, errorBuilder: (_,__,___) => const Icon(Icons.sports_soccer, color: Colors.amber)),
                               ),
-                              title: Text("${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}", style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                              title: Text("${filteredMatches[i]['home']} - ${filteredMatches[i]['away']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                               subtitle: Padding(
-                                padding: const EdgeInsets.top(6),
+                                padding: const EdgeInsets.only(top: 6),
                                 child: Text("Kezdés: ${filteredMatches[i]['time']}", style: TextStyle(color: Colors.amber[600], fontSize: 12, fontWeight: FontWeight.w600)),
                               ),
                               trailing: _buildStatusBadge(filteredMatches[i]['status'], filteredMatches[i]['liveScore']),
@@ -526,7 +516,7 @@ class _MainScreenState extends State<MainScreen> {
                                       decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16)),
                                       child: ListTile(
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                                        leading: const CircleAvatar(backgroundColor: Alignment.centerLeft, radius: 16, child: Icon(Icons.analytics_outlined, size: 16, color: Colors.amber)),
+                                        leading: const CircleAvatar(backgroundColor: Colors.transparent, radius: 16, child: Icon(Icons.analytics_outlined, size: 16, color: Colors.amber)),
                                         title: Text(activeTips[i]['match'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                         subtitle: Text(activeTips[i]['pick'], style: const TextStyle(color: Colors.amber, fontSize: 12)),
                                         trailing: Row(
