@@ -552,7 +552,7 @@ class _MainScreenState extends State<MainScreen> {
                                         leading: Icon(isWon ? Icons.check_circle : Icons.cancel, color: isWon ? Colors.greenAccent : Colors.redAccent, size: 22),
                                         title: Text(settledTips[i]['match'], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                         subtitle: Padding(
-                                          padding: const EdgeInsets.top(4),
+                                          padding: const EdgeInsets.only(top: 4),
                                           child: Text("${settledTips[i]['pick']}\nOdds: ${settledTips[i]['odds']}  |  Tét: ${settledTips[i]['stake']}", style: const TextStyle(fontSize: 11, color: Colors.grey, height: 1.3)),
                                         ),
                                         trailing: IconButton(icon: const Icon(Icons.delete_outline, color: Colors.grey, size: 18), onPressed: () => setState(() { _savedTips.removeAt(realIndex); _saveTips(); })),
