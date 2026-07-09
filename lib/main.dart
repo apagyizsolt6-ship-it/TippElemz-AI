@@ -63,7 +63,7 @@ class _MainScreenState extends State<MainScreen> {
   List<Map<String, dynamic>> _savedTips = [];
   bool _isLoading = false;
   bool _isLiveOnly = false;
-  bool _hideFriendlies = false; // Kikapcsolva alapértelmezetten, hogy lásd a nyári meccseket is
+  bool _hideFriendlies = false;
   String _searchQuery = "";
   final String _apiKey = '1c45d28585a3aac87ced5ab96062b57f';
 
@@ -98,7 +98,7 @@ class _MainScreenState extends State<MainScreen> {
     await file.writeAsString(json.encode(_savedTips));
   }
 
-  // --- 🧠 OKOSABB TARTALÉKOS POISSON ENGINE PIACI ODDSOKHOZ IGAZÍTVA ---
+  // --- 🧠 JAVÍTOTT, BOMBABIZTOS POISSON ENGINE VÁLTOZÓ DEKLARÁCIÓKKAL ---
   Map<String, dynamic> _calculateRealAiPredictions({
     required Map<String, dynamic> homeStats,
     required Map<String, dynamic> awayStats,
@@ -109,22 +109,27 @@ class _MainScreenState extends State<MainScreen> {
     int nameSeed = homeName.hashCode ^ awayName.hashCode;
     bool hasRealApiData = homeStats.isNotEmpty && awayStats.isNotEmpty;
 
-    // Alapértelmezett értékek az oddsok alapján, ha nincs API adat
+    // Kezdeti alapértelmezett értékek
     double homeAtt = 1.3;
     double homeDef = 1.2;
     double awayAtt = 1.1;
     double awayDef = 1.3;
 
     if (realOdds > 1.0 && realOdds < 10.0) {
-      // Ha alacsony a hazai odds, a hazai csapat erősebb generálást kap
       if (realOdds < 1.7) {
-        homeAtt = 2.1; homeDef = 0.8; awayAtt = 0.7; awayDef = 1.9;
+        homeAtt = 2.1; 
+        homeDef = 0.8; 
+        awayAtt = 0.7; 
+        awayDef = 1.9;
       } else if (realOdds > 3.5) {
-        homeAtt = 0.9; homeDef = 1.7; awayAtt = 1.8; awayDef = 1.0;
+        homeAtt = 0.9; 
+        homeDef = 1.7; 
+        awayAtt = 1.8; 
+        awayDef = 1.0;
       }
     }
 
-    // Ha van valós API adat, akkor felülírjuk az átlagokkal
+    // Ha van valós API adat, felülírjuk az átlagokkal
     if (hasRealApiData) {
       homeAtt = double.tryParse(homeStats['goals']?['for']?['average']?['home']?.toString() ?? '') ?? homeAtt;
       awayDef = double.tryParse(awayStats['goals']?['against']?['average']?['away']?.toString() ?? '') ?? awayDef;
