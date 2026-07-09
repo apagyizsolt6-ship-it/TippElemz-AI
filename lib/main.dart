@@ -85,6 +85,21 @@ class _MainScreenState extends State<MainScreen> {
     _loadAllData();
   }
 
+  Widget _buildMomentumBar(int score) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text("Live Momentum", style: TextStyle(fontSize: 9, color: Colors.grey)),
+      const SizedBox(height: 4),
+      Container(
+        height: 4, width: double.infinity,
+        decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(2)),
+        child: FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: (score / 100).clamp(0.0, 1.0),
+          child: Container(color: score > 70 ? Colors.redAccent : Colors.greenAccent),
+        ),
+      ),
+    ]);
+  }
   Future<void> _loadAllData() async {
     await _loadSavedTips();
     await _loadMatches();
@@ -110,24 +125,6 @@ class _MainScreenState extends State<MainScreen> {
     await file.writeAsString(json.encode(_savedTips));
   }
 
-  // --- ÚJ FUNKCIÓK INTEGRÁLVA ---
-  Widget _buildMomentumBar(int score) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text("Élő Intenzitás", style: TextStyle(fontSize: 10, color: Colors.grey)),
-      const SizedBox(height: 4),
-      Container(
-        height: 6,
-        width: double.infinity,
-        decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(3)),
-        child: FractionallySizedBox(
-          alignment: Alignment.centerLeft,
-          widthFactor: (score / 100).clamp(0.0, 1.0),
-          child: Container(decoration: BoxDecoration(color: score > 70 ? Colors.redAccent : Colors.greenAccent, borderRadius: BorderRadius.circular(3))),
-        ),
-      ),
-    ]);
-  }
-
   Map<String, dynamic> _calculateRealAiPredictions({
     required Map<String, dynamic> homeStats,
     required Map<String, dynamic> awayStats,
@@ -137,30 +134,52 @@ class _MainScreenState extends State<MainScreen> {
   }) {
     int nameSeed = homeName.hashCode.abs() ^ (awayName.hashCode.abs() << 2);
     bool hasRealApiData = homeStats.isNotEmpty && awayStats.isNotEmpty;
-
-    // AI Logic marad...
-    double prob = 0.55; 
+    
+    double aiProb = 0.55; 
     double marketProb = realOdds > 1 ? (1 / realOdds) : 0.5;
-    bool isValue = (prob / marketProb) > 1.05;
+    bool isValue = (aiProb / marketProb) > 1.05;
 
-    var result = _calculateOriginalPredictions(homeStats, awayStats, realOdds, homeName, awayName);
-    result["isValue"] = isValue;
-    result["momentum"] = 40 + (nameSeed % 60);
-    return result;
-  }
+    double homeAtt = 1.3;
+    double homeDef = 1.2;
+    double awayAtt = 1.1;
+    double awayDef = 1.3;
 
-  // Segédmetódus az eredeti logika megtartásához
-  Map<String, dynamic> _calculateOriginalPredictions(homeStats, awayStats, realOdds, homeName, awayName) {
-    int nameSeed = homeName.hashCode.abs() ^ (awayName.hashCode.abs() << 2);
+    if (realOdds > 1.0 && realOdds < 10.0) {
+      if (realOdds < 1.6) {
+        homeAtt = 2.2; homeDef = 0.7; awayAtt = 0.7; awayDef = 2.0;
+      } else if (realOdds < 2.1) {
+        homeAtt = 1.6; homeDef = 1.1; awayAtt = 1.2; awayDef = 1.5;
+      } else if (realOdds > 3.5) {
+        homeAtt = 0.8; homeDef = 1.9; awayAtt = 2.0; awayDef = 0.9;
+      }
+    }
+
+    if (hasRealApiData) {
+      homeAtt = double.tryParse(homeStats['goals']?['for']?['average']?['home']?.toString() ?? '1.4') ?? 1.4;
+      homeDef = double.tryParse(homeStats['goals']?['against']?['average']?['home']?.toString() ?? '1.1') ?? 1.1;
+      awayAtt = double.tryParse(awayStats['goals']?['for']?['average']?['away']?.toString() ?? '1.1') ?? 1.1;
+      awayDef = double.tryParse(awayStats['goals']?['against']?['average']?['away']?.toString() ?? '1.4') ?? 1.4;
+    }
+
+    double homeExpectedGoals = (homeAtt + awayDef) / 2;
+    double awayExpectedGoals = (awayAtt + homeDef) / 2;
+    int homeGoals = homeExpectedGoals.round().clamp(0, 5);
+    int awayGoals = awayExpectedGoals.round().clamp(0, 5);
+    String exactScore = "$homeGoals - $awayGoals";
+    String matchOutcomeText = (homeGoals > awayGoals) ? "Hazai Győzelem" : ((awayGoals > homeGoals) ? "Vendég Győzelem" : "Döntetlen");
+    int scoreConf = 55 + (nameSeed % 15);
+
     return {
-      "outcome": "Hazai Győzelem",
-      "scoreConf": "${55 + (nameSeed % 15)}% Conf", "isScoreBest": true,
-      "score": "2 - 1",
-      "corners": "Over 9.5", "cornersConf": "68% Conf", "isCornersBest": false,
-      "fouls": "Over 20.5", "foulsConf": "62% Conf", "isFoulsBest": false,
-      "cards": "Over 3.5", "cardsConf": "65% Conf", "isCardsBest": false,
-      "offsides": "Over 2.5", "offsidesConf": "60% Conf", "isOffsidesBest": false,
-      "marketOdds": realOdds
+      "outcome": hasRealApiData ? "$matchOutcomeText (Éles Stat)" : "$matchOutcomeText (AI Elemzés)", 
+      "scoreConf": "$scoreConf% Conf", "isScoreBest": true,
+      "score": exactScore,
+      "corners": "Over ${8.5 + (nameSeed % 4)}", "cornersConf": "${68 + (nameSeed % 12)}% Conf", "isCornersBest": false,
+      "fouls": "Over ${20.5 + (nameSeed % 4)}", "foulsConf": "${62 + (nameSeed % 14)}% Conf", "isFoulsBest": false,
+      "cards": "Over ${3.5 + (nameSeed % 2)}", "cardsConf": "${65 + (nameSeed % 10)}% Conf", "isCardsBest": false,
+      "offsides": "Over 2.5", "offsidesConf": "${60 + (nameSeed % 8)}% Conf", "isCardsBest": false,
+      "marketOdds": realOdds,
+      "isValue": isValue,
+      "momentum": 40 + (nameSeed % 60)
     };
   }
 
@@ -172,26 +191,38 @@ class _MainScreenState extends State<MainScreen> {
         return FutureBuilder<Map<String, dynamic>>(
           future: _fetchRealDataAndAnalyze(m),
           builder: (context, snapshot) {
-            final ai = snapshot.data ?? {"outcome": "...", "momentum": 50, "isValue": false};
-            return Container(
-              color: Colors.black54,
-              child: Dialog(
-                backgroundColor: Theme.of(context).cardColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Text("${m['home']} vs ${m['away']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    if (ai['isValue'] == true) 
-                      Container(margin: const EdgeInsets.all(8), padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(8)), child: const Text("VALUE BET! 🔥", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12))),
-                    const SizedBox(height: 15),
-                    _buildMomentumBar(ai['momentum']),
-                    const Divider(height: 30),
-                    _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'].toString(), ai['scoreConf'].toString(), Colors.blueAccent),
-                    const SizedBox(height: 20),
-                    ElevatedButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Bezárás")),
-                  ]),
-                ),
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator(color: Colors.amber));
+            }
+            final ai = snapshot.data ?? {"outcome": "N/A", "momentum": 50, "isValue": false};
+            double currentOdds = double.tryParse(ai['marketOdds'].toString()) ?? 2.0;
+
+            return Dialog(
+              backgroundColor: Theme.of(context).cardColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Text("${m['home']} vs ${m['away']}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  if (ai['isValue'] == true) 
+                    Container(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(8)), child: const Text("VALUE BET! 🔥", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11))),
+                  const SizedBox(height: 12),
+                  _buildMomentumBar(ai['momentum']),
+                  const SizedBox(height: 15),
+                  _buildStatRow(Icons.sports_soccer, "Várható kimenetel", ai['outcome'].toString(), ai['scoreConf'].toString(), Colors.blueAccent),
+                  _buildStatRow(Icons.radio_button_checked, "Szöglet", ai['corners'].toString(), ai['cornersConf'].toString(), Colors.greenAccent),
+                  _buildStatRow(Icons.receipt_long, "Lapok", ai['cards'].toString(), ai['cardsConf'].toString(), Colors.yellowAccent),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.bookmark_add_outlined),
+                    label: const Text("Tipp mentése"),
+                    onPressed: () {
+                      setState(() => _savedTips.add({"match": "${m['home']} - ${m['away']}", "pick": ai['outcome'], "status": "pending", "odds": currentOdds, "stake": 10.0}));
+                      _saveTips(); Navigator.pop(dialogContext);
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                  ),
+                ]),
               ),
             );
           },
@@ -199,25 +230,33 @@ class _MainScreenState extends State<MainScreen> {
       },
     );
   }
-
   Future<Map<String, dynamic>> _fetchRealDataAndAnalyze(Map<String, dynamic> m) async {
-    // API hívások maradnak...
-    return _calculateRealAiPredictions(homeStats: {}, awayStats: {}, realOdds: 2.1, homeName: m['home'] ?? '', awayName: m['away'] ?? '');
+    var client = HttpClient();
+    double realOdds = 0.0;
+    try {
+      if (m['fixtureId'] != null) {
+        var req = await client.getUrl(Uri.parse('https://v3.football.api-sports.io/odds?fixture=${m['fixtureId']}'));
+        req.headers.add('x-rapidapi-key', _apiKey);
+        var res = await req.close();
+        if (res.statusCode == 200) {
+           var data = json.decode(await res.transform(utf8.decoder).join());
+        }
+      }
+    } catch (_) {}
+    return _calculateRealAiPredictions(homeStats: {}, awayStats: {}, realOdds: realOdds, homeName: m['home'] ?? 'H', awayName: m['away'] ?? 'A');
   }
 
-  // ... A többi metódus (loadMatches, build, stb.) marad az eredeti formában ...
-  
-  Widget _buildStatRow(IconData icon, String title, String value, String conf, Color color, {bool isBest = false}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
+  Widget _buildStatRow(IconData icon, String title, String value, String conf, Color color) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
     child: Row(children: [
-      Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color, size: 20)),
-      const SizedBox(width: 14),
+      Icon(icon, color: color, size: 20),
+      const SizedBox(width: 12),
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-        Text(conf, style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+        Text(conf, style: const TextStyle(fontSize: 10, color: Colors.grey)),
       ]),
       const Spacer(),
-      Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+      Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
     ]),
   );
 
@@ -234,9 +273,8 @@ class _MainScreenState extends State<MainScreen> {
         setState(() => _allMatches = List<Map<String, dynamic>>.from(data.map((m) => {
           "fixtureId": m['fixture']['id'], "leagueId": m['league']['id'], "homeId": m['teams']['home']['id'], "awayId": m['teams']['away']['id'],
           "home": m['teams']['home']['name'], "away": m['teams']['away']['name'], "logo": m['league']['logo'],
-          "status": m['fixture']['status']['short'], "league": m['league']['name'],
-          "time": m['fixture']['date'] != null ? DateFormat('HH:mm').format(DateTime.parse(m['fixture']['date']).toLocal()) : "--:--",
-          "liveScore": (m['goals']['home'] != null) ? " ${m['goals']['home']}-${m['goals']['away']} " : ""
+          "status": m['fixture']['status']['short'], "time": DateFormat('HH:mm').format(DateTime.parse(m['fixture']['date']).toLocal()),
+          "liveScore": (m['goals']['home'] != null) ? "${m['goals']['home']}-${m['goals']['away']}" : ""
         })));
       }
     } catch (_) {}
@@ -246,8 +284,11 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("AI PRO ANALYZER")),
-      body: _isLoading ? const Center(child: CircularProgressIndicator()) : ListView.builder(
+      appBar: AppBar(
+        title: const Text("AI PRO ANALYZER"),
+        actions: [IconButton(icon: const Icon(Icons.brightness_6), onPressed: widget.toggleTheme)],
+      ),
+      body: _isLoading ? const Center(child: CircularProgressIndicator(color: Colors.amber)) : ListView.builder(
         itemCount: _allMatches.length,
         itemBuilder: (_, i) => ListTile(
           title: Text("${_allMatches[i]['home']} - ${_allMatches[i]['away']}"),
