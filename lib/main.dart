@@ -77,7 +77,7 @@ class _MainScreenState extends State<MainScreen> {
   bool _hideFriendlies = false;
   String _searchQuery = "";
   final String _apiKey = '1c45d28585a3aac87ced5ab96062b57f';
-  double _totalBankroll = 100000.0; // BANKROLL MODUL
+  double _totalBankroll = 100000.0;
 
   @override
   void initState() {
@@ -236,7 +236,6 @@ class _MainScreenState extends State<MainScreen> {
                     const SizedBox(height: 8),
                     Text("AI Predikció: ${ai['score']}", style: TextStyle(color: Colors.amber[400], fontWeight: FontWeight.w600, fontSize: 13)),
                     
-                    // AI TREND ANALYZER
                     const Divider(height: 24, thickness: 1),
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -252,7 +251,7 @@ class _MainScreenState extends State<MainScreen> {
                     _buildStatRow(Icons.radio_button_checked, "Szöglet (O/U)", ai['corners'].toString(), ai['cornersConf'].toString(), Colors.greenAccent, isBest: ai['isCornersBest'] == true),
                     _buildStatRow(Icons.warning_amber, "Szabálytalanság (O/U)", ai['fouls'].toString(), ai['foulsConf'].toString(), Colors.orangeAccent, isBest: ai['isFoulsBest'] == true),
                     _buildStatRow(Icons.receipt_long, "Lapok (O/U)", ai['cards'].toString(), ai['cardsConf'].toString(), Colors.yellowAccent, isBest: ai['isCardsBest'] == true),
-                    _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", ai['offsides'].toString(), ai['offsidesConf'].toString(), Colors.purpleAccent, isBest: ai['isOffsidesBest'] == true),
+                    _buildStatRow(Icons.flag_outlined, "Lesek (O/U)", ai['offsides'].toString(), ai['offsidesConf'].toString(), Colors.purpleAccent, isBest: ai['isCardsBest'] == true),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
@@ -416,7 +415,9 @@ class _MainScreenState extends State<MainScreen> {
             "logo": m['league']['logo'],
             "status": m['fixture']['status']['short'],
             "league": m['league']['name'],
-            "time": m['fixture']['date'] != null ? DateFormat('HH:mm').format(DateTime.parse(m['fixture']['date'])) : "--:--",
+            "time": m['fixture']['date'] != null 
+                ? DateFormat('HH:mm').format(DateTime.parse(m['fixture']['date']).toLocal()) 
+                : "--:--",
             "liveScore": currentScore
           };
         })));
@@ -486,7 +487,6 @@ class _MainScreenState extends State<MainScreen> {
 
     int ratedTips = wonTips + lostTips;
     String winRate = ratedTips > 0 ? "${((wonTips / ratedTips) * 100).toStringAsFixed(0)}%" : "0%";
-    String roi = totalStake > 0 ? "${((netProfit / totalStake) * 100).toStringAsFixed(1)}%" : "0.0%";
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -518,10 +518,8 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // LIVE PULSE ANIMÁCIÓ
   Widget _buildStatusBadge(String status, String liveScore) {
     bool isLive = ['1H', '2H', 'ET', 'LIVE'].contains(status);
-    bool isCancelled = status == 'CANC' || status == 'PST';
     
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.5, end: 1.0),
